@@ -1,0 +1,2 @@
+viam-sdk==0.85.0
+python-dotenv==1.2.4
