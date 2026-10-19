@@ -1,0 +1,55 @@
+Notes:
+
+This exercise is designed to take about an evening. We are more interested in how you approach it than in polish; a partial solution with clear reasoning is a good submission.
+You will use a simulated arm, so no robot hardware is required. You will need a laptop with a webcam.
+Easiest way to submit code is with a GitHub repo. Include a short README (see below).
+Come to the interview prepared to walk through what you built, what you learned, where you got stuck, how you would teach this to another developer, and any feedback you have on Viam's docs, SDK, or platform.
+Let us know if you have any questions. Email nick.hehr@viam.com and CC shannon.bradshaw@viam.com and amanda@viam.com .
+
+It's day two of a trade show. The booth staff have been standing for nine hours, their voices are gone, and the coffee ran out at noon. Meet Greeter: a robotic arm at the front of the booth that notices people walking by, turns to acknowledge them, gives them a moment of attention, and then moves on to the next passerby so the humans can sit down for a minute.
+
+Greeter consists of:
+
+a simulated robotic arm (Viam's builtin fake arm, or the simulated arm from the SO-101 module in the Viam Registry)
+a webcam (your laptop camera or an external webcam)
+a vision service running a pre-trained people detector
+
+Using the Viam Python SDK, write a script containing a control loop that allows Greeter to:
+Look for people using the camera and a machine learning model, and orient the arm toward them
+Hold on a person for a moment so they feel acknowledged
+Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker
+Attempt to not get "stuck" or crash when asked to move somewhere the arm can't reach
+
+The arm and the camera don't share a physical world, so you will need to decide what "orient toward a person" means. Any reasonable interpretation is fine. In your README, state:
+
+where you assumed the camera sits relative to the arm
+how you map a detection in the image to an arm command, and why you chose that mapping
+anything you would do differently on a real arm
+
+Resources:
+
+Viam Python SDK: https://python.viam.dev/
+Viam documentation: https://docs.viam.com/
+Configuring a fake arm: https://docs.viam.com/reference/components/arm/fake/ or https://app.viam.com/registry?org=16518049-9dd3-479f-9644-c5d112aa42d8&term=simulated-arm . The simulated arm can simulate motion over time via a configuration attribute, so moves are not instantaneous.
+SO-101 module in the Viam Registry (includes simulated arm and gripper components): https://app.viam.com/module/devrel/so101-arm 
+Configuring a webcam: https://docs.viam.com/reference/components/camera/webcam/ 
+People detection: either the pre-trained EfficientDet model with the TFLite ML Model service (https://app.viam.com/ml-model/bill/effdet0 ) paired with an mlmodel vision service or the YOLOv8 module from the Registry (https://app.viam.com/module/viam-labs/YOLOv8 ). Both run fine on laptop hardware.
+Once your machine is configured, the 3D scene in the Viam app shows the simulated arm's current position and its movements, so you can see what your code is doing.
+Other tutorials on the docs site may also be useful.
+
+Detections come back as bounding boxes in image coordinates, and arm joint positions are read and written in degrees. The following prints the detections in the current camera frame and the arm's current joint positions:
+
+from viam.components.arm import Arm
+from viam.services.vision import VisionClient
+
+# robot comes from a RobotClient connection
+detector = VisionClient.from_robot(robot, "people_detector")
+arm = Arm.from_robot(robot, "arm")
+
+detections = await detector.get_detections_from_camera("cam")
+for d in detections:
+    print(d.class_name, d.confidence, d.x_min, d.y_min, d.x_max, d.y_max)
+
+joints = await arm.get_joint_positions()
+print(joints.values)
+
