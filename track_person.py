@@ -13,6 +13,7 @@ Run:  python track_person.py   (watch the arm in the app's 3D scene; Ctrl-C stop
 '''
 
 import asyncio
+import os
 import time
 
 from viam.components.arm import Arm
@@ -21,7 +22,7 @@ from viam.proto.component.arm import JointPositions
 from detect_person import PersonDetector
 from connect import connect
 
-ARM_NAME = "arm-1"
+ARM_NAME = os.environ.get("GREETER_ARM", "arm-1")  # set in .env; "arm-1" is the simulated arm
 BASE_LIMIT_DEG = 110.0   # SO-101 base joint limit, from the arm's kinematics
 SMOOTHING = 0.5          # [0.0-1.0],fraction of the way to the new target each frame
 DEADBAND_DEG = 3.0       # [deg], ignore changes smaller than this so the arm doesn't jitter

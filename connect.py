@@ -25,15 +25,16 @@ async def main():
         print('Resources:')
         print(machine.resource_names)
         
-        # arm-1
-        arm_1: Arm = Arm.from_robot(machine, "arm-1")
-        arm_1_return_value = await arm_1.get_end_position()
-        print(f"arm-1 get_end_position return value: {arm_1_return_value}")
+        # arm (name from GREETER_ARM in .env)
+        arm_name = os.environ.get("GREETER_ARM", "arm-1")
+        arm: Arm = Arm.from_robot(machine, arm_name)
+        arm_return_value = await arm.get_end_position()
+        print(f"{arm_name} get_end_position return value: {arm_return_value}")
 
-        # gripper-1
-        gripper_1: Gripper = Gripper.from_robot(machine, "gripper-1")
-        gripper_1_return_value = await gripper_1.is_moving()
-        print(f"gripper-1 is_moving return value: {gripper_1_return_value}")
+        # gripper
+        gripper: Gripper = Gripper.from_robot(machine, "gripper-SO101-real")
+        gripper_return_value = await gripper.is_moving()
+        print(f"gripper-SO101-real is_moving return value: {gripper_return_value}")
 
         # cam
         cam: Camera = Camera.from_robot(machine, "cam")

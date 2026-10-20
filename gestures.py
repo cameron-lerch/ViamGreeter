@@ -27,18 +27,21 @@ JOINT_LIMITS = [
     (-157.2, 162.8),   # wrist roll
 ]
 
-IDLE_CENTER = [0.0, -10.0, 5.0, 10.0, 0.0]     # out in front, hand tipped slightly down
-POINT = [0.0, -15.0, 10.0, 5.0, 0.0]            # arm outstretched, hand level: pointing at the person
-RAISED = [0.0, -25.0, -55.0, -10.0, 0.0]        # forearm and hand pointing up, like a raised hand
-REACH = [0.0, 5.0, 20.0, 10.0, 0.0]             # hand low and out toward the person
+HAND_ROLL = 90.0  # wrist roll that turns the gripper so it reads as a flat hand
+
+IDLE_CENTER = [0.0, -10.0, 5.0, 10.0, HAND_ROLL]   # out in front, hand tipped slightly down
+POINT = [0.0, -15.0, 10.0, 5.0, HAND_ROLL]         # arm outstretched, hand level: pointing at the person
+RAISED = [0.0, -25.0, -55.0, -10.0, HAND_ROLL]     # forearm and hand pointing up, like a raised hand
+REACH = [0.0, 5.0, 20.0, 10.0, HAND_ROLL]          # hand low and out toward the person
 
 WAVE_PERIOD_S = 2.0
-BECKON_PERIOD_S = 2.0
+BECKON_PERIOD_S = 3.7    # the 70 deg wrist curl needs this long to stay under the ~60 deg/s cap
+BECKON_CURL_DEG = 70.0   # wrist pitch travel: from +10 (pointing down) to -60 (pulled back up)
+IDLE_CYCLE_S = 126.0     # idle periods 14, 9 and 7 s line up every 126 s
 
 
 def _sin(t: float, period: float, phase: float = 0.0) -> float:
     return math.sin(2 * math.pi * t / period + phase)
-
 
 def clamp_pose(pose: list[float]) -> list[float]:
     '''Keep every joint inside its limits, so no command can ask for an unreachable pose.'''
@@ -75,6 +78,21 @@ def idle_pose(t: float) -> list[float]:
     ]
 
 
+def nearest_idle_time(pose: list[float], step_s: float = 0.1) -> float:
+    '''The point in the idle cycle closest to `pose`.
+
+    Resuming idle from here, instead of wherever the clock happens to be, means
+    the arm picks up its scanning motion from where it already is rather than
+    swinging across to a far-off point on the path.
+    '''
+    # The base is weighted most: a big base swing is the jarring part, and the
+    # raised wave pose can't be matched by idle's other joints anyway.
+    weights = (10.0, 1.0, 1.0, 1.0, 0.0)
+    times = (i * step_s for i in range(int(IDLE_CYCLE_S / step_s)))
+    return min(times, key=lambda t: sum(w * (a - b) ** 2
+                                        for w, a, b in zip(weights, idle_pose(t), pose)))
+
+
 def point_pose(base: float) -> list[float]:
     '''Arm outstretched toward the person: makes it obvious who is being greeted.'''
     return [base] + POINT[1:]
@@ -104,6 +122,6 @@ def beckon_pose(t: float, base: float) -> list[float]:
         base,
         shoulder,
         elbow + 10.0 * _sin(t, BECKON_PERIOD_S),
-        wrist - 15.0 * (1 - math.cos(2 * math.pi * t / BECKON_PERIOD_S)),  # curls up to 30 deg
+        wrist - BECKON_CURL_DEG / 2 * (1 - math.cos(2 * math.pi * t / BECKON_PERIOD_S)),
         roll,
     ]
