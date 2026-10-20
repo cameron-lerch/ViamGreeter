@@ -34,6 +34,11 @@ ARM_NAME = os.environ.get("GREETER_ARM", "arm-1")  # set in .env; "arm-1" is the
 # Scales how fast the motions play (0.5 = half speed), e.g. for a first run on
 # real hardware. Perception and tracking timings stay in real time.
 SPEED = float(os.environ.get("GREETER_SPEED", "1.0"))
+# Wrist roll that makes the gripper read as a hand differs per arm: the gestures
+# are written for the simulated arm's 90 deg, the real SO-101 wants 0 deg. Arms
+# not listed use the gestures' own value, so the simulated arm is unaffected.
+HAND_ROLL_BY_ARM = {"arm-SO101-real": 0.0}
+ROLL_OFFSET = HAND_ROLL_BY_ARM.get(ARM_NAME, gestures.HAND_ROLL) - gestures.HAND_ROLL
 TICK_S = 0.1              # motion loop period
 TRANSITION_S = 1.5        # blend time whenever the active motion changes
 POINT_S = 2.5             # point at the person so it's obvious who is being greeted
@@ -141,11 +146,13 @@ class Greeter:
 
     async def move(self):
         last = time.monotonic()
+        failures = 0
         while True:
             tick = time.monotonic()
             self.motion_clock += (tick - last) * SPEED
             last = tick
             pose = self.desired_pose(tick)
+            pose[4] += ROLL_OFFSET  # before blending: blend_from is in the arm's own roll
             if self.blend_from is not None:
                 pose = gestures.blend(self.blend_from, pose,
                                       (self.motion_clock - self.phase_start) / TRANSITION_S)
@@ -153,21 +160,50 @@ class Greeter:
             try:
                 await self.arm.move_to_joint_positions(JointPositions(values=pose), timeout=2)
                 self.last_cmd = pose
-            except Exception as e:  # stop, report, and keep going on the next tick
-                print(f"  move failed: {type(e).__name__}: {e}")
-                await self.arm.stop()
-                self.last_cmd = list((await self.arm.get_joint_positions()).values)
+                failures = 0
+            except Exception as e:  # report, back off, and keep going
+                failures += 1
+                print(f"  move failed ({failures} in a row): {type(e).__name__}: {e}")
+                await self.recover(failures)
             await asyncio.sleep(max(0.0, TICK_S - (time.monotonic() - tick)))
 
+    async def recover(self, failures: int):
+        '''Best-effort recovery after a failed move. Never raises.
+
+        On real hardware the recovery calls can fail too (e.g. a servo bus
+        timeout), so each step is guarded; the loop just tries again next tick.
+        Repeated failures back off, up to 2 s, to give the bus time to clear.
+        '''
+        try:
+            await self.arm.stop(timeout=2)
+        except Exception as e:
+            print(f"    stop failed too: {type(e).__name__}")
+        try:  # blend on from where the arm really is; keep the old pose if unreadable
+            self.last_cmd = list((await self.arm.get_joint_positions(timeout=2)).values)
+        except Exception as e:
+            print(f"    could not read joints: {type(e).__name__}")
+        await asyncio.sleep(min(2.0, 0.25 * failures))
+
     async def run(self):
-        self.last_cmd = list((await self.arm.get_joint_positions()).values)
+        for attempt in range(1, 6):  # the starting pose is needed to ease into idle
+            try:
+                self.last_cmd = list((await self.arm.get_joint_positions(timeout=2)).values)
+                break
+            except Exception as e:
+                print(f"  reading start pose failed (attempt {attempt}/5): {type(e).__name__}")
+                if attempt == 5:
+                    raise
+                await asyncio.sleep(0.5)
         print(f"Greeter running on '{ARM_NAME}' at {SPEED:g}x speed (Ctrl-C to stop)...")
         self.start_idle(time.monotonic())  # ease from wherever the arm starts into idle
         try:
             # If either loop crashes, gather raises and the finally stops the arm.
             await asyncio.gather(self.perceive(), self.move())
         finally:
-            await self.arm.stop()
+            try:
+                await self.arm.stop(timeout=2)
+            except Exception as e:
+                print(f"  final stop failed: {type(e).__name__}: {e}")
 
 
 async def main():
