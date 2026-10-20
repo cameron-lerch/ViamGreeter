@@ -17,7 +17,7 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101. One setting in `.en
 7. [Repository structure](#7-repository-structure)
 8. [Setup and usage](#8-setup-and-usage)
 9. [Moving to a real robot](#9-moving-to-a-real-robot)
-10. [Known limitations](#10-known-limitations)
+10. [Shortcomings and proposed solutions](#10-shortcomings-and-proposed-solutions)
 11. [Future improvements](#11-future-improvements)
 
 ---
@@ -64,16 +64,16 @@ The work went in stages, each tested on the machine before moving on:
 
 ### Notes and sketches
 
-<!-- Drop photos/scans into docs/images/ and update the paths below. -->
+<!-- Drop photos/scans into media/images/ and update the paths below. -->
 
 | | |
 |:---:|:---:|
-| **[Image placeholder]** `docs/images/notes-1.jpg` | **[Image placeholder]** `docs/images/notes-2.jpg` |
+| **[Image placeholder]** `media/images/notes-1.jpg` | **[Image placeholder]** `media/images/notes-2.jpg` |
 | *Caption: initial system sketch* | *Caption: camera-to-arm mapping* |
 
 <!--
 Replace the table above with images once uploaded, e.g.:
-| ![Initial system sketch](docs/images/notes-1.jpg) | ![Camera-to-arm mapping](docs/images/notes-2.jpg) |
+| ![Initial system sketch](media/images/notes-1.jpg) | ![Camera-to-arm mapping](media/images/notes-2.jpg) |
 -->
 
 ---
@@ -81,18 +81,45 @@ Replace the table above with images once uploaded, e.g.:
 ## 3. Demo
 
 <!--
-To embed a video on GitHub: edit this README on github.com and drag the .mp4 into the editor;
-GitHub uploads it and inserts a link that plays inline. Alternatively commit it under docs/videos/
-and link it, e.g. [Watch the demo](docs/videos/sim-demo.mp4). Keep files under ~100 MB.
+Inline playback: GitHub only plays videos inline in a README when they're uploaded through
+github.com. Edit this README on GitHub, drag media/videos/<file> into the editor at the
+INLINE PLAYER marker, and GitHub inserts a https://github.com/user-attachments/assets/... link
+that renders as a player. The links below open the copies committed in this repo.
 -->
 
 ### Simulated SO-101 (Viam 3D scene)
 
-> **[Video placeholder]** Simulated arm: idle scan → point → beckon → wave → next person. `docs/videos/sim-demo.mp4`
+<!-- INLINE PLAYER: drag media/videos/greeter_sim.webm here in the GitHub web editor -->
+
+**[Watch the simulation demo](media/videos/greeter_sim.webm)** (`media/videos/greeter_sim.webm`)
+
+The video opens on the **idle behaviour**: a slow, gentle scanning sway that dips above and below horizontal while the camera watches for passersby. When a person is detected, Greeter:
+
+1. **Points** at them with an outstretched arm for **2.5 seconds**, so it's obvious who is being greeted.
+2. **Beckons** them over **twice**: the hand reaches low towards them and curls up and back.
+3. **Waves** at them with a raised hand.
+4. **Transitions smoothly back** into the gentle idle sway, picking up from wherever the arm is.
+
+Throughout the greeting, the base **keeps tracking the person** as they move.
+
+*Not pictured:* Greeter keeps a **queue** of everyone it has seen and greets them one at a time, closest first. It **never greets the same person twice**, unless they leave the scene for **more than 3 seconds** and come back, in which case they're treated as a new visitor.
+
+> **[Your thoughts]** *Add your own commentary on the simulation run: what you were testing, what you're pleased with, what you'd tune.*
 
 ### Real SO-101
 
-> **[Video placeholder]** Physical arm running the same behaviour with streamed motion. `docs/videos/real-demo.mp4`
+<!-- INLINE PLAYER: drag media/videos/greeter_real.mov here in the GitHub web editor -->
+
+**[Watch the real-arm demo](media/videos/greeter_real.mov)** (`media/videos/greeter_real.mov`)
+
+The physical SO-101 runs the same Greeter behaviour (idle, point, beckon, wave, back to idle), driven by the same code. The differences are the real-arm settings described in [§9](#9-moving-to-a-real-robot):
+- motion is **streamed** as one continuous, timed trajectory instead of separate moves;
+- the wave uses a **bent-elbow pose** to reduce servo rattle;
+- the wrist roll is set to make the gripper read as a hand.
+
+Some fine shimmer remains; that's the limit of the hobby servos (see [§9.3](#93-final-real-arm-settings)).
+
+> **[Your thoughts]** *Check this description matches the video, and add your own commentary: how the real arm compared with the simulation, and what surprised you.*
 
 ---
 
@@ -240,7 +267,7 @@ ViamGreeter/
 ├── track_person.py     # Standalone test: turn the base towards the closest person
 ├── connect.py          # Connects to the machine using credentials from .env
 ├── requirements.txt    # Python dependencies
-├── docs/
+├── media/
 │   ├── images/         # Notes and sketches
 │   └── videos/         # Demo videos
 └── problem_statement.txt
@@ -378,13 +405,22 @@ The port varies by machine. The remaining fine shimmer comes from the hobby serv
 
 ---
 
-## 10. Known limitations
+## 10. Shortcomings and proposed solutions
 
-- **Identity from bearing only.** Two people crossing paths can swap tracks. Someone standing still whose detection drops for more than 3 s will be greeted again.
-- **Direction only, no distance.** One webcam gives no depth, so the arm aims only by rotating the base. Pitch isn't aimed at the person's height.
-- **Camera placement is assumed.** The mapping assumes the camera sits at the base and looks along +x; any misalignment becomes an aiming error.
-- **Occlusion.** On the real arm, the arm can pass in front of the camera during gestures.
-- **Settings live in code.** Most tuning values are constants in the source rather than configuration.
+Known gaps in the current version, and how I'd address each with more time or resources.
+
+| Shortcoming | Impact | Proposed solution |
+|---|---|---|
+| **Losing or swapping people who cross paths.** Tracks are matched only by bearing (direction). | When two people cross, their identities can swap: Greeter may switch to the wrong person mid-greeting, or think the greeted person is new. | **Remember what each person looks like**, such as a face or clothing appearance embedding, and match on that as well as position (re-identification). This is more intensive than I first expected: it needs an extra model running on every detection, storage for everyone who has appeared, and care around privacy at a public event. A cheaper first step is matching on box overlap (IoU) with a Kalman filter that predicts each person's motion, which handles most crossings. |
+| **Re-greeting someone who lingers.** A track is forgotten after 3 s without detections. | A person standing still whose detection drops out briefly (bad angle, occlusion) can be greeted again. | Keep greeted tracks much longer than ungreeted ones. Re-identification (above) solves it properly. |
+| **Direction but no distance.** One webcam gives no depth, so only the base aims. | The arm points towards a person but not at their height or distance. Box size is a rough stand-in for distance, so a tall adult far away can rank as "closer" than a child near the booth. | Use the elevation (already computed) to aim the shoulder and wrist pitch, or add a **depth camera** for true 3D positions and distance-based priorities. |
+| **Camera placement is assumed, not measured.** | Any offset or rotation between the camera and the arm's 0° becomes an aiming error on real hardware. | Record the camera's pose in Viam's **frame system** and transform bearings through it. Add a short calibration step (stand at a marked spot and confirm the arm points there). |
+| **The arm can block the camera.** On the real arm, gestures pass in front of a base-mounted camera. | Detections can drop or jump mid-gesture, so tracking may briefly freeze. | Mount the camera higher or off to one side (with the offset in the frame system), or ignore detections in the image region the arm covers during a gesture. |
+| **Closest-first can make people wait a long time.** | In a crowd, someone further away may never reach the front of the queue. | Score the queue on proximity **and** waiting time, and favour people approaching the booth (box growing) over people walking past. |
+| **Real-arm motion is at the hardware's limit.** | Some fine shimmer remains on the SO-101's hobby servos, and the fastest transition (~91°/s) is near its speed cap. | Generate smoother trajectories (splines), check each one against the configured speed and acceleration before sending, or use higher-quality servos. |
+| **False positives from static people-like objects.** | A poster or mannequin detected as a person would be greeted. | Ignore tracks that never move, or require some motion before a track becomes eligible. |
+| **Runs as a laptop script.** | If the laptop sleeps or the script crashes, Greeter stops until someone restarts it. | Package it as a **Viam module** (generic service) so `viam-server` supervises and restarts it and its settings appear in the app. |
+| **Settings live in code, and there are no automated tests.** | Tuning means editing the source, and regressions are caught by eye in the 3D scene. | Move settings into config or module attributes. Add unit tests for the pure logic (`pixel_to_direction`, `PeopleTracker`, gesture speed limits) and run them in CI. |
 
 ---
 
