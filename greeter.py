@@ -56,11 +56,14 @@ MOTION = os.environ.get("GREETER_MOTION", MOTION_BY_ARM.get(ARM_NAME, "steps"))
 STREAM_LEAD_S = 0.3       # streamed points are time-stamped this far ahead, so the arm never runs dry
 TICK_S = 0.1              # motion loop period
 TRANSITION_S = 1.5        # blend time whenever the active motion changes
+WAVE_BLEND_S = 1.2        # shorter beckon -> wave blend, so the wave follows the beckon without a lull
 POINT_S = 2.5             # point at the person so it's obvious who is being greeted
-# Gestures hold still while blending in, then run their full cycles, so the
-# blend never swallows the first beckon or wave.
+# The beckon holds still while blending in, then runs its full cycles, so the
+# blend never swallows the first beckon. The wave instead starts swaying during
+# its blend, so the arm rises straight into a moving wave; its two full sways
+# still come after the blend.
 BECKON_S = TRANSITION_S + 2 * gestures.BECKON_PERIOD_S
-WAVE_S = TRANSITION_S + 2 * gestures.WAVE_PERIOD_S
+WAVE_S = WAVE_BLEND_S + 2 * gestures.WAVE_PERIOD_S
 MIN_IDLE_S = 2.0          # idle at least this long between greetings
 LOST_S = 2.0              # end a greeting early once the target is gone this long
 BASE_FOLLOW = 0.2         # per-tick smoothing of the base toward the person's bearing
@@ -80,6 +83,7 @@ class Greeter:
         self.target_id: int | None = None
         self.target_base = 0.0
         self.idle_epoch = 0.0  # idle motion time = motion_clock - idle_epoch
+        self.blend_s = TRANSITION_S  # blend length for the current phase
 
     # --- perception ---------------------------------------------------------
 
@@ -95,11 +99,12 @@ class Greeter:
 
     # --- behavior -----------------------------------------------------------
 
-    def set_phase(self, phase: str, now: float):
+    def set_phase(self, phase: str, now: float, blend_s: float = TRANSITION_S):
         waiting = self.tracker.waiting(now, exclude=self.target_id)
         print(f"{phase:>6}  (others waiting: {waiting})")
         self.phase, self.phase_start = phase, self.motion_clock
         self.blend_from = self.last_cmd  # every switch blends from wherever the arm is
+        self.blend_s = blend_s
 
     def start_idle(self, now: float):
         '''Resume idle at the point on its path nearest the arm's current pose.'''
@@ -152,10 +157,10 @@ class Greeter:
         if self.phase == "beckon":
             if t < BECKON_S:
                 return gestures.beckon_pose(gesture_t, self.target_base)
-            self.set_phase("wave", now)
-            t, gesture_t = 0.0, 0.0
+            self.set_phase("wave", now, blend_s=WAVE_BLEND_S)
+            t = 0.0
         if t < WAVE_S:
-            pose = gestures.wave_pose(gesture_t, self.target_base)
+            pose = gestures.wave_pose(t, self.target_base)  # sways during the blend too
             pose[1:4] = [v + o for v, o in zip(pose[1:4], WAVE_OFFSET)]
             return pose
         self.finish_greeting(now)
@@ -172,7 +177,7 @@ class Greeter:
             pose[4] += ROLL_OFFSET  # before blending: blend_from is in the arm's own roll
             if self.blend_from is not None:
                 pose = gestures.blend(self.blend_from, pose,
-                                      (self.motion_clock - self.phase_start) / TRANSITION_S)
+                                      (self.motion_clock - self.phase_start) / self.blend_s)
             pose = gestures.clamp_pose(pose)
             try:
                 await self.arm.move_to_joint_positions(JointPositions(values=pose), timeout=2)
@@ -191,7 +196,7 @@ class Greeter:
         pose[4] += ROLL_OFFSET  # before blending: blend_from is in the arm's own roll
         if self.blend_from is not None:
             pose = gestures.blend(self.blend_from, pose,
-                                  (self.motion_clock - self.phase_start) / TRANSITION_S)
+                                  (self.motion_clock - self.phase_start) / self.blend_s)
         return gestures.clamp_pose(pose)
 
     async def move_streamed(self):
