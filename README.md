@@ -28,12 +28,12 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101. One setting in `.en
 
 Using the Viam Python SDK, write a script with a control loop that lets Greeter:
 
-| # | Requirement |
+| # | Requirements |
 |---|---|
-| R1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
-| R2 | Hold on a person for a moment so they feel acknowledged |
-| R3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
-| R4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
+| 1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
+| 2 | Hold on a person for a moment so they feel acknowledged |
+| 3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
+| 4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
 
 The README must also state:
 
@@ -43,7 +43,7 @@ The README must also state:
 | Q2 | How a detection in the image maps to an arm command, and why | [§5.2](#52-mapping-a-detection-to-an-arm-command) |
 | Q3 | What I'd do differently on a real arm | [§9](#9-moving-to-a-real-robot) |
 
-**My goals beyond the brief:** make the greeting read clearly to a passerby (point, then beckon, then wave), keep every motion smooth, and make the code structured so it could become a deployable Viam module.
+**My goals beyond the brief:** make the greeting read clearly to a passerby (point, then beckon, then wave), keep every motion smooth, add in a gentle swaying idle sequence, and make the code structured so it could become a deployable Viam module.
 
 ---
 
