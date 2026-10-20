@@ -20,6 +20,7 @@ Run:  python greeter.py   (watch the arm in the app's 3D scene; Ctrl-C stops)
 import asyncio
 import os
 import time
+from datetime import timedelta
 
 from viam.components.arm import Arm
 from viam.proto.component.arm import JointPositions
@@ -39,6 +40,20 @@ SPEED = float(os.environ.get("GREETER_SPEED", "1.0"))
 # not listed use the gestures' own value, so the simulated arm is unaffected.
 HAND_ROLL_BY_ARM = {"arm-SO101-real": 0.0}
 ROLL_OFFSET = HAND_ROLL_BY_ARM.get(ARM_NAME, gestures.HAND_ROLL) - gestures.HAND_ROLL
+# Real-arm wave: a fully upright arm leaves the servos with no gravity load, so
+# gear backlash rattles at the top. Tilting the upper arm and forearm forward
+# keeps the gears loaded and shortens the lever. [shoulder, elbow, wrist pitch];
+# the hand still points straight up. Arms not listed use the gestures' RAISED.
+WAVE_RAISED_BY_ARM = {"arm-SO101-real": [-15.0, -50.0, -25.0]}
+WAVE_OFFSET = [want - base for want, base in
+               zip(WAVE_RAISED_BY_ARM.get(ARM_NAME, gestures.RAISED[1:4]), gestures.RAISED[1:4])]
+# How poses reach the arm. "steps": one move_to_joint_positions per tick (fine on
+# the simulated arm). "streamed": one continuous time-stamped trajectory, because
+# on the real SO-101 every single move starts and ends at rest, which made the
+# 10 Hz steps jittery and slow. GREETER_MOTION overrides the per-arm default.
+MOTION_BY_ARM = {"arm-SO101-real": "streamed"}
+MOTION = os.environ.get("GREETER_MOTION", MOTION_BY_ARM.get(ARM_NAME, "steps"))
+STREAM_LEAD_S = 0.3       # streamed points are time-stamped this far ahead, so the arm never runs dry
 TICK_S = 0.1              # motion loop period
 TRANSITION_S = 1.5        # blend time whenever the active motion changes
 POINT_S = 2.5             # point at the person so it's obvious who is being greeted
@@ -140,7 +155,9 @@ class Greeter:
             self.set_phase("wave", now)
             t, gesture_t = 0.0, 0.0
         if t < WAVE_S:
-            return gestures.wave_pose(gesture_t, self.target_base)
+            pose = gestures.wave_pose(gesture_t, self.target_base)
+            pose[1:4] = [v + o for v, o in zip(pose[1:4], WAVE_OFFSET)]
+            return pose
         self.finish_greeting(now)
         return self.idle_pose()
 
@@ -166,6 +183,50 @@ class Greeter:
                 print(f"  move failed ({failures} in a row): {type(e).__name__}: {e}")
                 await self.recover(failures)
             await asyncio.sleep(max(0.0, TICK_S - (time.monotonic() - tick)))
+
+    def next_pose(self, tick: float, dt: float) -> list[float]:
+        '''Advance the motion clock by dt and return the clamped pose to command.'''
+        self.motion_clock += dt * SPEED
+        pose = self.desired_pose(tick)
+        pose[4] += ROLL_OFFSET  # before blending: blend_from is in the arm's own roll
+        if self.blend_from is not None:
+            pose = gestures.blend(self.blend_from, pose,
+                                  (self.motion_clock - self.phase_start) / TRANSITION_S)
+        return gestures.clamp_pose(pose)
+
+    async def move_streamed(self):
+        '''Real-arm motion: the same poses as move(), sent as one continuous,
+        time-stamped trajectory so the arm flows between them without stopping.
+
+        Each tick's pose is stamped STREAM_LEAD_S ahead of now, keeping a small
+        buffer in the arm. If the stream faults, recover and start a new one
+        from wherever the arm is (a stream must begin at rest, at time zero).
+        '''
+        failures = 0
+        while True:
+            start = last = time.monotonic()
+            origin = list(self.last_cmd)
+
+            async def batches():
+                nonlocal last
+                yield [Arm.TrajectoryPoint(time=timedelta(seconds=0.0), positions=origin)]
+                while True:
+                    await asyncio.sleep(max(0.0, TICK_S - (time.monotonic() - last)))
+                    tick = time.monotonic()
+                    pose = self.next_pose(tick, tick - last)
+                    last = tick
+                    yield [Arm.TrajectoryPoint(
+                        time=timedelta(seconds=tick - start + STREAM_LEAD_S), positions=pose)]
+                    self.last_cmd = pose
+
+            try:
+                async for _ in self.arm.move_through_joint_positions_streamed(batches()):
+                    failures = 0
+                print("  trajectory stream ended; starting a new one")
+            except Exception as e:  # report, back off, and stream again
+                failures += 1
+                print(f"  stream failed ({failures} in a row): {type(e).__name__}: {e}")
+                await self.recover(failures)
 
     async def recover(self, failures: int):
         '''Best-effort recovery after a failed move. Never raises.
@@ -194,11 +255,12 @@ class Greeter:
                 if attempt == 5:
                     raise
                 await asyncio.sleep(0.5)
-        print(f"Greeter running on '{ARM_NAME}' at {SPEED:g}x speed (Ctrl-C to stop)...")
+        print(f"Greeter running on '{ARM_NAME}' ({MOTION} motion) at {SPEED:g}x speed (Ctrl-C to stop)...")
         self.start_idle(time.monotonic())  # ease from wherever the arm starts into idle
         try:
             # If either loop crashes, gather raises and the finally stops the arm.
-            await asyncio.gather(self.perceive(), self.move())
+            move = self.move_streamed() if MOTION == "streamed" else self.move()
+            await asyncio.gather(self.perceive(), move)
         finally:
             try:
                 await self.arm.stop(timeout=2)
