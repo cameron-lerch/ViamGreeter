@@ -88,8 +88,7 @@ that renders as a player. The links below open the copies committed in this repo
 -->
 
 ### Simulated SO-101 (Viam 3D scene)
-
-[Simulated SO-101](https://github.com/user-attachments/assets/657e7ac3-a07f-4b7f-a611-5bbc258ccf20)
+[Simulated SO-101](https://github.com/user-attachments/assets/957f2d4b-a655-4539-b3ad-b83c1ff9707a)
 
 **[Watch the simulation demo](media/videos/greeter_sim.mp4)** (`media/videos/greeter_sim.mp4`)
 
@@ -108,7 +107,7 @@ Throughout the greeting, the base **keeps tracking the person** as they move.
 
 ### Real SO-101
 
-[Real SO-101](https://github.com/user-attachments/assets/957f2d4b-a655-4539-b3ad-b83c1ff9707a)
+[Real SO-101](https://github.com/user-attachments/assets/657e7ac3-a07f-4b7f-a611-5bbc258ccf20)
 
 **[Watch the real-arm demo](media/videos/greeter_real.mp4)** (`media/videos/greeter_real.mp4`)
 
