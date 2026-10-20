@@ -64,14 +64,13 @@ def idle_pose(t: float) -> list[float]:
     '''Slow scanning sweep: side to side with a gentle up-and-down bob.
 
     The periods don't divide evenly, so the path drifts instead of repeating
-    exactly and looks less mechanical. The wrist swings from pointing well
-    above the horizon to well below it, so the hand dips as it scans.
+    exactly and looks less mechanical. 
     Peak speed is ~22 deg/s.
     '''
     base, shoulder, elbow, wrist, roll = IDLE_CENTER
     return [
         base + 30.0 * _sin(t, 14.0),
-        shoulder + 10.0 * _sin(t, 9.0),
+        shoulder + 10 * _sin(t, 9.0),
         elbow + 12.0 * _sin(t, 9.0, 1.0),
         wrist + 25.0 * _sin(t, 7.0),
         roll,
