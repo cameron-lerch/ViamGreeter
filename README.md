@@ -89,9 +89,9 @@ that renders as a player. The links below open the copies committed in this repo
 
 ### Simulated SO-101 (Viam 3D scene)
 
-<!-- INLINE PLAYER: drag media/videos/greeter_sim.webm here in the GitHub web editor -->
+<!-- INLINE PLAYER: drag media/videos/greeter_sim.mp4 here in the GitHub web editor -->
 
-**[Watch the simulation demo](media/videos/greeter_sim.webm)** (`media/videos/greeter_sim.webm`)
+**[Watch the simulation demo](media/videos/greeter_sim.mp4)** (`media/videos/greeter_sim.mp4`)
 
 The video opens on the **idle behaviour**: a slow, gentle scanning sway that dips above and below horizontal while the camera watches for passersby. When a person is detected, Greeter:
 
@@ -108,9 +108,9 @@ Throughout the greeting, the base **keeps tracking the person** as they move.
 
 ### Real SO-101
 
-<!-- INLINE PLAYER: drag media/videos/greeter_real.mov here in the GitHub web editor -->
+<!-- INLINE PLAYER: drag media/videos/greeter_real.mp4 here in the GitHub web editor -->
 
-**[Watch the real-arm demo](media/videos/greeter_real.mov)** (`media/videos/greeter_real.mov`)
+**[Watch the real-arm demo](media/videos/greeter_real.mp4)** (`media/videos/greeter_real.mp4`)
 
 The physical SO-101 runs the same Greeter behaviour (idle, point, beckon, wave, back to idle), driven by the same code. The differences are the real-arm settings described in [§9](#9-moving-to-a-real-robot):
 - motion is **streamed** as one continuous, timed trajectory instead of separate moves;
@@ -362,7 +362,8 @@ I initially expected the move from simulation to a real arm to need **some tunin
 | Symptom on the real SO-101 | Root cause | Fix |
 |---|---|---|
 | Very jittery; joints sometimes moved one at a time; slow | The motion loop sent a new target **10 times a second**. The simulated arm accepts each one instantly, but on the real arm each `MoveToJointPositions` is a complete move that starts and ends at rest. I measured a median of **258 ms per command**, so only 17 of 40 commands were sent in a 4 s wave, each a stop-start. | Added a **`streamed`** motion mode: the same poses are sent as one continuous, **timestamped trajectory** (`move_through_joint_positions_streamed`), 0.3 s ahead. The arm moves through them without stopping. A lag test showed the real arm follows the stream within **0.15–0.2 s**, with no backlog. |
-| Servo bus errors (`sync_read ... read 40 of 48 expected bytes`), then a crash | Mostly **USB contention**: the 1080p webcam and the arm's serial adapter shared a USB controller. Moving the webcam to another port fixed it. The crash itself was mine: the recovery code called the same failing bus and didn't catch the second error. | Hardware layout. Recovery now never raises, backs off as failures repeat, and retries reading the start pose. |
+| The arm module kept **dropping bytes** from the servos (`communication error during sync_read: read 40 of 48 expected bytes`), and joint reads and moves failed | **USB contention.** The webcam was plugged into the **same USB dongle** as the arm's serial adapter. The 1080p video stream filled the shared USB link, so replies from the servo bus arrived incomplete and the module timed out. The servo bus was the victim, not the cause. | Moved the webcam to **its own USB port**, and the errors stopped. Hardware layout matters as much as code. |
+| Greeter **crashed** after one of those bus errors | My bug: after a failed move, the recovery code (`stop()`, then re-reading the joints) went to the same failing bus, and nothing caught its exception | Recovery now never raises, backs off as failures repeat, and retries reading the start pose. Tested with a fake arm where 30% of calls fail. |
 | Shaking at the top of the wave | With the arm straight up, gravity puts almost no load on the servos, so **gear backlash** rattles over a long lever | A real-arm-only **bent-elbow wave pose**: forearm tilted forward, hand still up |
 | The hand looked wrong | Wrist roll zero differs between the simulated and real arm | Wrist roll for each arm: 90° in simulation, 0° on the real arm |
 
@@ -372,6 +373,7 @@ All real-arm differences are keyed to the **arm name** (`HAND_ROLL_BY_ARM`, `WAV
 
 - A simulation hides assumptions. Here it hid **command rate, bus bandwidth and acceleration**. The simulated arm also ignored speed limits, which hid how fast I was really driving it.
 - On real hardware, prefer **fewer, richer commands** (timed trajectories) over many small ones.
+- **Hardware layout is part of the system.** A webcam on the same USB dongle as the servo adapter was enough to corrupt servo communication. Give high-bandwidth devices their own USB controller.
 - **Error handling has to assume the recovery calls can fail too.**
 - Check the **module and server logs** (`viam-agent`), not only the client error. They pointed at the servo bus.
 - Keep the simulated arm configured next to the real one, so changes can always be checked against simulation.
@@ -417,6 +419,7 @@ Known gaps in the current version, and how I'd address each with more time or re
 | **Camera placement is assumed, not measured.** | Any offset or rotation between the camera and the arm's 0° becomes an aiming error on real hardware. | Record the camera's pose in Viam's **frame system** and transform bearings through it. Add a short calibration step (stand at a marked spot and confirm the arm points there). |
 | **The arm can block the camera.** On the real arm, gestures pass in front of a base-mounted camera. | Detections can drop or jump mid-gesture, so tracking may briefly freeze. | Mount the camera higher or off to one side (with the offset in the frame system), or ignore detections in the image region the arm covers during a gesture. |
 | **Closest-first can make people wait a long time.** | In a crowd, someone further away may never reach the front of the queue. | Score the queue on proximity **and** waiting time, and favour people approaching the booth (box growing) over people walking past. |
+| **Sensitive to USB layout.** A camera sharing a USB dongle or hub with the servo adapter filled the shared link and made the arm module drop bytes. | On a different laptop or booth setup the arm could fail again, with an error that points at the servos rather than the camera. | Document the required wiring (camera and servo adapter on separate USB controllers, or a powered hub), lower the camera resolution (Greeter doesn't need 1080p), and watch for the module's `sync_read` errors so the problem shows up immediately instead of as jitter. |
 | **Real-arm motion is at the hardware's limit.** | Some fine shimmer remains on the SO-101's hobby servos, and the fastest transition (~91°/s) is near its speed cap. | Generate smoother trajectories (splines), check each one against the configured speed and acceleration before sending, or use higher-quality servos. |
 | **False positives from static people-like objects.** | A poster or mannequin detected as a person would be greeted. | Ignore tracks that never move, or require some motion before a track becomes eligible. |
 | **Runs as a laptop script.** | If the laptop sleeps or the script crashes, Greeter stops until someone restarts it. | Package it as a **Viam module** (generic service) so `viam-server` supervises and restarts it and its settings appear in the app. |
