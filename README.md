@@ -193,9 +193,9 @@ The base joint's sign was measured on the arm: at base +30°, the end of the arm
 Idle, point, beckon and wave are each a plain function `pose = f(t)` in `gestures.py`. Ten times a second, the controller asks the active motion where the arm should be *now*. This gives:
 
 - **Instant interruption.** Idle is only sampled, never left running, so it can stop the moment someone appears.
-- **Smooth switches.** Every switch blends from the arm's actual pose using a smoothstep curve, which starts and ends gently. Returning to idle resumes at the point on the idle path **nearest the arm's current pose**, so the arm never swings across to a distant point.
+- **Smooth trajectories between gestures.** Every change in gesture (idle, point, beckon, or wave) blends from the arm's actual pose using a smoothstep curve, which starts and ends gently. Returning to idle resumes at the point on the idle path nearest the arm's current pose, so the arm never swings across to a distant point.
 - **Continuous tracking.** The person's bearing feeds into every gesture.
-- **Safety in one place.** Every pose passes through `clamp_pose()`: joint limits from the arm's kinematics, minus a 5° margin, with the shoulder further capped so the arm never reaches down into the table.
+- **Safety in one place.** Every pose passes through `clamp_pose()`: joint limits from the arm's kinematics, minus a 5° margin, with the shoulder further capped so the arm never reaches down into the table. 
 - **Speeds checked offline.** Each gesture is designed to stay under the arm's speed limit.
 
 ### 5.4 Tracking and the greeting queue
@@ -218,12 +218,12 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 
 | Requirement | Implementation | Where |
 |---|---|---|
-| **R1** Look for people and orient towards them | effdet0 via the `people_detector` vision service. Each box becomes a bearing, then a base angle, smoothed every tick. | `detect_person.py`, `greeter.py` (`desired_pose`) |
-| **R2** Hold on a person | Point (2.5 s), then two beckons, then two waves, about 17 s per person, while the base follows them | `greeter.py`, `gestures.py` |
-| **R3** Sensible when nobody is there | Slow scanning idle that never repeats exactly. Resumes from wherever the arm is. | `gestures.idle_pose`, `Greeter.start_idle` |
-| **R3** Robust to dropouts and flicker | 3-frame confirmation, 3 s track memory, 2 s loss tolerance mid-greeting. Detection errors are logged and the loop continues. | `tracking.py`, `Greeter.perceive` |
-| **R4** Don't get stuck on unreachable poses | Joint-space commands only (no inverse kinematics to fail), clamped to the kinematic limits with a 5° margin and a table-safe shoulder cap | `gestures.clamp_pose` |
-| **R4** Don't crash | Every arm call has a timeout. Failures trigger a guarded recovery (stop, re-read the pose) with increasing back-off. The start pose is read with retries. Tested with a fake arm where 30% of calls fail. | `Greeter.recover`, `Greeter.run` |
+| **11** Look for people and orient towards them | effdet0 via the `people_detector` vision service. Each box becomes a bearing, then a base angle, smoothed every tick. | `detect_person.py`, `greeter.py` (`desired_pose`) |
+| **2** Hold on a person | Point (2.5 s), then two beckons, then two waves, about 17 s per person, while the base follows them | `greeter.py`, `gestures.py` |
+| **3** Sensible when nobody is there | Slow scanning idle that never repeats exactly. Resumes from wherever the arm is. | `gestures.idle_pose`, `Greeter.start_idle` |
+| **3** Robust to dropouts and flicker | 3-frame confirmation, 3 s track memory, 2 s loss tolerance mid-greeting. Detection errors are logged and the loop continues. | `tracking.py`, `Greeter.perceive` |
+| **4** Don't get stuck on unreachable poses | Joint-space commands only (no inverse kinematics to fail), clamped to the kinematic limits with a 5° margin and a table-safe shoulder cap | `gestures.clamp_pose` |
+| **4** Don't crash | Every arm call has a timeout. Failures trigger a guarded recovery (stop, re-read the pose) with increasing back-off. The start pose is read with retries. Tested with a fake arm where 30% of calls fail. | `Greeter.recover`, `Greeter.run` |
 | Uses the Viam Python SDK | `viam-sdk` 0.85: `RobotClient`, `Arm`, `VisionClient` | all |
 | Simulated arm, webcam, people detector | Simulated SO-101, webcam `cam`, TFLite effdet0 + mlmodel vision service | [§8.2](#82-machine-configuration) |
 
