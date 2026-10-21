@@ -1,4 +1,8 @@
-# ViamGreeter
+<p align="center">
+  <img src="media/images/arm-SO101.png" alt="SO-101 robotic arm" width="260">
+</p>
+
+<h1 align="center">ViamGreeter</h1>
 
 **An autonomous booth greeter built on the [Viam](https://www.viam.com/) platform.** A fixed webcam and a pre-trained people detector spot people walking past a trade-show booth. An SO-101 robotic arm then turns towards each person, points at them, beckons them over, waves, and moves on to the next passerby.
 
@@ -56,7 +60,7 @@ The README must also state:
 The work went in stages, each tested on the machine before moving on:
 
 1. **Detection.** Configure the webcam and the effdet0 people detector, then turn bounding boxes into directions in the robot's frame (`detect_person.py`).
-2. **Tracking test.** Turn only the base joint towards the closest person, to check the whole chain from camera to arm (`track_person.py`).
+2. **Tracking test.** Turn only the base joint towards the closest person, to check the whole chain from camera to arm (a standalone test script, kept as a local tool and not part of this repo).
 3. **Behaviour.** Design the gestures as functions of time, add a state machine and a tracker with a queue, and tune the motion in the 3D scene (`greeter.py`, `gestures.py`, `tracking.py`).
 4. **Real hardware.** Port to a physical SO-101, diagnose the gap between simulation and the real arm, and restructure how motion reaches the arm (see [§9](#9-moving-to-a-real-robot)).
 
@@ -263,11 +267,10 @@ ViamGreeter/
 ├── gestures.py         # Motions as pose = f(t); blending, clamping, joint limits
 ├── tracking.py         # Turns detections into tracks; flicker filter; greeting queue
 ├── detect_person.py    # Vision service → people with bearings; runnable live viewer
-├── track_person.py     # Standalone test: turn the base towards the closest person
 ├── connect.py          # Connects to the machine using credentials from .env
 ├── requirements.txt    # Python dependencies
 ├── media/
-│   ├── images/         # Notes and sketches
+│   ├── images/         # Header image, notes and sketches
 │   └── videos/         # Demo videos
 └── problem_statement.txt
 ```
@@ -278,7 +281,6 @@ ViamGreeter/
 | **`gestures.py`** | Pure functions with no SDK dependency. They return 5 joint angles `[base, shoulder, elbow, wrist pitch, wrist roll]` for a given time: `idle_pose`, `point_pose`, `beckon_pose`, `wave_pose`. Also holds the joint limits and `clamp_pose`, the `smoothstep` blending, and `nearest_idle_time` for resuming idle smoothly. Joint directions were measured on the arm and are documented in the file. |
 | **`tracking.py`** | `PeopleTracker` matches each frame's detections to `Track`s by bearing, confirms new tracks, forgets stale ones, keeps the `greeted` flag, and returns `next_target()`, the closest eligible person. |
 | **`detect_person.py`** | `PersonDetector.detect()` gets one image and its detections from the vision service in a single call, keeps confident `person` detections, and converts each to bearing and elevation with `pixel_to_direction()`. Run it directly to print live detections and per-frame latency. |
-| **`track_person.py`** | A simpler test that only rotates the base towards the closest person, with smoothing and a deadband. Useful for checking camera alignment and the sign of the mapping on new hardware. |
 | **`connect.py`** | `connect()` reads the API key and machine address from `.env`. Run it directly to list the machine's resources as a connection check. |
 
 ---
@@ -333,8 +335,7 @@ GREETER_SPEED=1.0            # optional: 0.5 = half-speed gestures (e.g. first r
 ```bash
 python3 connect.py          # 1. connection check: lists the machine's resources
 python3 detect_person.py    # 2. live detections: step to your right, and the bearing should go positive
-python3 track_person.py     # 3. base-only tracking test
-python3 greeter.py          # 4. the full Greeter (Ctrl-C stops the arm)
+python3 greeter.py          # 3. the full Greeter (Ctrl-C stops the arm)
 ```
 
 Watch the arm in the app's **3D SCENE** tab. Run **one script at a time**: two scripts commanding the same arm cancel each other's moves.
@@ -455,4 +456,3 @@ Known gaps in the current version, and how I'd address each with more time or re
 - [ ] Unit tests for the pure logic (`pixel_to_direction`, `PeopleTracker`, gesture speed limits) and CI
 - [ ] Commit a sanitized machine config (`config/machine.json`) and a `.env.example`
 - [ ] Logging and metrics (people seen, greetings, dropouts) through Viam data capture, for a booth dashboard
-- [ ] Use `track_person.py`'s helpers from the main code, or move it into a `tools/` folder
