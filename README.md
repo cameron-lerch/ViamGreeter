@@ -4,7 +4,7 @@
 
 <h1 align="center">ViamGreeter</h1>
 
-An autonomous booth greeter built on the [Viam](https://www.viam.com/) platform. Using a fixed webcam and a pre-trained people detector to spot people walking past a trade-show booth, an SO-101 robotic arm turns towards each person, points at them, beckons them over, waves, and moves on to the next passerby.
+Greeter is an autonomous booth greeter built on the [Viam](https://www.viam.com/) platform. Using a fixed webcam and a pre-trained model to detect and track people passing by a trade show booth, Greeter directs an SO-101 robotic arm to engage with each passerby. The arm turns toward them, points, beckons them over, and waves before moving on to the next person.
 
 It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be chosen via a setting in `.env`. The default is a simulated arm.
 
