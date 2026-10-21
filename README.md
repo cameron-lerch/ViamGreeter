@@ -4,9 +4,9 @@
 
 <h1 align="center">ViamGreeter</h1>
 
-**An autonomous booth greeter built on the [Viam](https://www.viam.com/) platform.** A fixed webcam and a pre-trained people detector spot people walking past a trade-show booth. An SO-101 robotic arm then turns towards each person, points at them, beckons them over, waves, and moves on to the next passerby.
+An autonomous booth greeter built on the [Viam](https://www.viam.com/) platform. Using a fixed webcam and a pre-trained people detector to spot people walking past a trade-show booth, an SO-101 robotic arm turns towards each person, points at them, beckons them over, waves, and moves on to the next passerby.
 
-It runs on Viam's simulated SO-101 arm and on a real SO-101. One setting in `.env` switches between them.
+It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be chosen via a setting in `.env`. The default is a simulated arm.
 
 ---
 
@@ -26,7 +26,7 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101. One setting in `.en
 
 ---
 
-## 1. Problem statement and goals
+## 1. Problem Statement and Goals
 
 > It's day two of a trade show. The booth staff have been standing for nine hours, their voices are gone, and the coffee ran out at noon. Meet Greeter: a robotic arm at the front of the booth that notices people walking by, turns to acknowledge them, gives them a moment of attention, and then moves on to the next passerby so the humans can sit down for a minute.
 
@@ -34,10 +34,10 @@ Using the Viam Python SDK, write a script with a control loop that lets Greeter:
 
 | # | Requirements |
 |---|---|
-| 1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
-| 2 | Hold on a person for a moment so they feel acknowledged |
-| 3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
-| 4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
+| Req.1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
+| Req.2 | Hold on a person for a moment so they feel acknowledged |
+| Req.3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
+| Req.4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
 
 The README must also state:
 
