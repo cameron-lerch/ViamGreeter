@@ -82,8 +82,6 @@ I broke Greeter down into four stages, each tested before moving on to the next:
 3. **Gestures and Queue.** Design the gestures (*idle*, *point*, *beckon*, and *wave*), add a state machine, implement a queue system so each person is only greeted once, and refine the gestures in the 3D scene (`greeter.py`, `gestures.py`, `tracking.py`).
 4. **Real hardware.** Port to a physical SO-101, investigate the *sim-to-real* gap, and restructure how motion commands are sent to the arm (see [§9](#9-moving-to-a-real-robot)).
 
-> **[Your notes]** *What I'd tell another developer learning this, and where I got stuck.*
-
 ---
 
 ## 3. Demo
@@ -93,16 +91,16 @@ I broke Greeter down into four stages, each tested before moving on to the next:
 
 **[Watch the simulation demo](media/videos/greeter_sim.mp4)** (`media/videos/greeter_sim.mp4`)
 
-The video opens on the **idle behavior**: a slow, gentle scanning sway while the camera watches for people to pass by. When a person is detected, Greeter:
+The video opens on the **idle behavior**: a slow, gentle scanning sway while the camera watches for people to pass by. When a person is detected (~15 sec), Greeter:
 
 1. **Points** at them with an outstretched arm for 2.5 seconds, so it's obvious who is being greeted.
 2. **Beckons** them over twice: the hand reaches low toward them and curls up and back.
 3. **Waves** at them with a raised hand.
 4. **Transitions smoothly back** into the gentle idle sway, picking up the arms current pose.
 
-Throughout the greeting, the base joint tracks the person as they move.
+Throughout the greeting, the base joint rotates to track person as they move and all gestures remain centered on the person.
 
-*Not pictured:* Greeter keeps a **queue** of everyone in the scene and greets them one at a time, closest first. It never greets the same person twice, unless they leave the scene for more than 3 seconds and come back, in which case they're treated as a new visitor. If a person leaves the scene during a greeting sequence for more than 2 seconds, then the greeting stops and the idle sequence begins again or it moves on to the next person. 
+*Not pictured:* Greeter keeps a **queue** of everyone in the scene and greets them one at a time, closest first. It never greets the same person twice, unless they leave the scene for more than 3 seconds and come back, in which case they're treated as a new visitor. If a person leaves the scene during a greeting sequence for more than 2 seconds, then the greeting stops and the idle sequence begins again, or it moves on to the next person. 
 
 ### Real SO-101 Arm
 
@@ -112,12 +110,10 @@ Throughout the greeting, the base joint tracks the person as they move.
 
 The physical SO-101 runs the same Greeter behavior (idle, point, beckon, wave, back to idle), driven by the same code. The differences are the real-arm settings described in [§9](#9-moving-to-a-real-robot):
 - motion is **streamed** as one continuous, timed trajectory instead of separate moves;
-- the wave uses a **bent-elbow pose** to reduce servo rattle;
-- the wrist roll is set to make the gripper read as a hand.
+- the wave uses a **bent-elbow pose** to increase stability;
+- the real wrist is 90° offset compared to the simulation
 
-Some fine shimmer remains; that's the limit of the hobby servos (see [§9.4](#94-final-real-arm-settings)).
-
-> **[Your thoughts]** *Check this description matches the video, and add your own commentary: how the real arm compared with the simulation, and what surprised you.*
+Some slight shaking remains due to a combination of play in the gears and the arm being made from 3D printed materials (see [§9.4](#94-final-real-arm-settings)).
 
 ---
 
@@ -179,7 +175,7 @@ stateDiagram-v2
 | **Beckon** | Hand low and forward. The elbow and wrist move a quarter cycle apart, so the hand traces a loop and curls up and back: "come over here". |
 | **Wave** | Hand raised. The base sways ±10° while the wrist rocks. |
 
-In every greeting state, the base keeps following the person as they walk.
+During every gesture, the base joint tracks the person as they walk. 
 
 ---
 
@@ -215,7 +211,7 @@ The base joint's sign was measured on the arm: at base +30°, the end of the arm
 
 ### 5.3 Motions as Functions of Time
 
-Idle, point, beckon and wave are each a plain function `pose = f(t)` in `gestures.py`. Ten times a second, the controller asks the active motion where the arm should be *now*. This gives:
+*Idle*, *point*, *beckon* and *wave* are each a plain function `pose = f(t)` in `gestures.py`. Ten times a second, the controller asks the active motion where the arm should be *now*. This gives:
 
 - **Instant interruption.** Idle is only sampled, never left running, so it can stop the moment someone appears.
 - **Smooth trajectories between gestures.** Every change in gesture (idle, point, beckon, or wave) blends from the arm's actual pose using a smoothstep curve, which starts and ends gently. Returning to idle resumes at the point on the idle path nearest the arm's current pose, so the arm never swings across to a distant point.
