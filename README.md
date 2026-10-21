@@ -34,7 +34,7 @@ Using the Viam Python SDK, write a script with a control loop that lets Greeter:
 
 |  | Requirements |
 |---|---|
-| .1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
+| .1 | Look for people using the camera and a machine learning model, and orient the arm toward them |
 | .2 | Hold on a person for a moment so they feel acknowledged |
 | .3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
 | .4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
@@ -53,32 +53,33 @@ The README must also state:
 
 ## 2. Approach
 
-<!-- Fill in with your own words: how you broke the problem down, what you tried first, what changed along the way. -->
+My approach is to break a problem down into its simplest components and build up from there. I start by writing out the problem statement, then turn it into specific goals and the deliverables that must be included (for example, this README and a justification for the camera placement). Next, I sketch the system, whether that's a block diagram of the control scheme or a drawing of the physical setup. With the problem broken down, I brainstorm and note ideas for how to tackle each part.
 
-> **[Your notes]** *How I broke the problem down, and the order I tackled it in.*
+Greeter left a lot of room for creative freedom:
 
-The work went in stages, each tested on the machine before moving on:
+- how to greet people
+- where to place the camera
+- how the robot behaves when nobody is around
+- which ML model to use for detecting people
+- how to handle several people in view at once
+- how to compute trajectories and command the arm to follow them
+
+That freedom gave me space to explore, and it led to a greeting sequence designed to read clearly to a passerby: **idle → point → beckon → wave → idle**.
+
+<p align="center">
+  <img src="media/images/notebook.jpg" alt="Notebook pages: problem statement, goals, required deliverables, and a sketch of the camera-at-base setup" width="640">
+  <br>
+  <em>From my notebook: the problem statement, goals and required deliverables (left); the camera mounted at the arm's base with the world axes, people with bounding boxes, and the initial greeting idea (right).</em>
+</p>
+
+The process I followed, transferred from my notebook, went in stages, each tested on the machine before moving on:
 
 1. **Detection.** Configure the webcam and the effdet0 people detector, then turn bounding boxes into directions in the robot's frame (`detect_person.py`).
-2. **Tracking test.** Turn only the base joint towards the closest person, to check the whole chain from camera to arm (a standalone test script, kept as a local tool and not part of this repo).
-3. **Behaviour.** Design the gestures as functions of time, add a state machine and a tracker with a queue, and tune the motion in the 3D scene (`greeter.py`, `gestures.py`, `tracking.py`).
+2. **Tracking test.** Turn only the base joint toward the closest person, to check the whole chain from camera to arm (a standalone test script, kept as a local tool and not part of this repo).
+3. **Behavior.** Design the gestures as functions of time, add a state machine and a tracker with a queue, and tune the motion in the 3D scene (`greeter.py`, `gestures.py`, `tracking.py`).
 4. **Real hardware.** Port to a physical SO-101, diagnose the gap between simulation and the real arm, and restructure how motion reaches the arm (see [§9](#9-moving-to-a-real-robot)).
 
 > **[Your notes]** *What I'd tell another developer learning this, and where I got stuck.*
-
-### Notes and sketches
-
-<!-- Drop photos/scans into media/images/ and update the paths below. -->
-
-| | |
-|:---:|:---:|
-| **[Image placeholder]** `media/images/notes-1.jpg` | **[Image placeholder]** `media/images/notes-2.jpg` |
-| *Caption: initial system sketch* | *Caption: camera-to-arm mapping* |
-
-<!--
-Replace the table above with images once uploaded, e.g.:
-| ![Initial system sketch](media/images/notes-1.jpg) | ![Camera-to-arm mapping](media/images/notes-2.jpg) |
--->
 
 ---
 
@@ -96,10 +97,10 @@ that renders as a player. The links below open the copies committed in this repo
 
 **[Watch the simulation demo](media/videos/greeter_sim.mp4)** (`media/videos/greeter_sim.mp4`)
 
-The video opens on the **idle behaviour**: a slow, gentle scanning sway that dips above and below horizontal while the camera watches for passersby. When a person is detected, Greeter:
+The video opens on the **idle behavior**: a slow, gentle scanning sway that dips above and below horizontal while the camera watches for passersby. When a person is detected, Greeter:
 
 1. **Points** at them with an outstretched arm for **2.5 seconds**, so it's obvious who is being greeted.
-2. **Beckons** them over **twice**: the hand reaches low towards them and curls up and back.
+2. **Beckons** them over **twice**: the hand reaches low toward them and curls up and back.
 3. **Waves** at them with a raised hand.
 4. **Transitions smoothly back** into the gentle idle sway, picking up from wherever the arm is.
 
@@ -120,7 +121,7 @@ The physical SO-101 runs the same Greeter behavior (idle, point, beckon, wave, b
 - the wave uses a **bent-elbow pose** to reduce servo rattle;
 - the wrist roll is set to make the gripper read as a hand.
 
-Some fine shimmer remains; that's the limit of the hobby servos (see [§9.3](#93-final-real-arm-settings)).
+Some fine shimmer remains; that's the limit of the hobby servos (see [§9.4](#94-final-real-arm-settings)).
 
 > **[Your thoughts]** *Check this description matches the video, and add your own commentary: how the real arm compared with the simulation, and what surprised you.*
 
@@ -163,7 +164,7 @@ Two loops run at the same time in one asyncio program:
 - **Perception (~6 Hz):** camera → detector → tracker. The camera is fixed, so it keeps watching while the arm moves.
 - **Motion (10 Hz):** the state machine picks the active motion, samples it at the current time, blends across switches, clamps to joint limits, and sends the pose to the arm.
 
-### 4.2 Behaviour State Machine
+### 4.2 Behavior State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -180,7 +181,7 @@ stateDiagram-v2
 | State | What the arm does |
 |---|---|
 | **Idle** | Slow scanning sweep: the base moves ±30° while the shoulder, elbow and wrist bob on different rhythms, so the hand dips above and below horizontal. It repeats only every 126 s. |
-| **Point** | Arm stretched out level towards the person, so it's obvious who is being greeted. |
+| **Point** | Arm stretched out level toward the person, so it's obvious who is being greeted. |
 | **Beckon** | Hand low and forward. The elbow and wrist move a quarter cycle apart, so the hand traces a loop and curls up and back: "come over here". |
 | **Wave** | Hand raised. The base sways ±10° while the wrist rocks. |
 
@@ -202,7 +203,7 @@ Why a fixed camera instead of one on the wrist:
 
 ### 5.2 Mapping a Detection to an Arm Command
 
-Each person's bounding-box centre `(u, v)` becomes a **bearing** with a pinhole camera model. The focal length in pixels comes from the camera's horizontal field of view (`CAMERA_HFOV_DEG`, 70° for a Logitech C920 at 16:9):
+Each person's bounding-box center `(u, v)` becomes a **bearing** with a pinhole camera model. The focal length in pixels comes from the camera's horizontal field of view (`CAMERA_HFOV_DEG`, 70° for a Logitech C920 at 16:9):
 
 ```
 f        = (W / 2) / tan(HFOV / 2)
@@ -210,11 +211,11 @@ bearing  = -atan((u - W/2) / f)      # + = left of +x (counter-clockwise), world
 base     = -bearing                  # SO-101: positive base angle turns clockwise
 ```
 
-The base joint's sign was measured on the arm: at base +30°, the end of the arm moves towards −y. Elevation is computed the same way from `v`, but not used yet.
+The base joint's sign was measured on the arm: at base +30°, the end of the arm moves toward −y. Elevation is computed the same way from `v`, but not used yet.
 
 **Why this mapping:**
 
-- **Only the base needs to aim.** With a camera at the base, "orienting towards a person" is a rotation about the vertical axis, and the base joint gives exactly that.
+- **Only the base needs to aim.** With a camera at the base, "orienting toward a person" is a rotation about the vertical axis, and the base joint gives exactly that.
 - **It works with any resolution or camera.** Image size is read from every frame, so a different camera only needs its field of view (and `MIRRORED`, if the image is flipped).
 - **Joint space instead of Cartesian targets.** A single webcam gives direction but no distance, so a 3D target position would be invented. Commanding joint angles directly avoids inverse kinematics and motion-planning failures. After clamping to the joint limits, every command is reachable by construction.
 
@@ -235,8 +236,8 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 | Rule | Value | Purpose |
 |---|---|---|
 | Confirm a new track | 3 frames (~0.5 s) | Ignore one-frame false detections |
-| Eligible to greet | confirmed, not yet greeted, seen in the last 0.6 s | Never turn towards someone who just left |
-| Queue order | Closest first (largest box), re-checked every time | Prioritise people near the booth |
+| Eligible to greet | confirmed, not yet greeted, seen in the last 0.6 s | Never turn toward someone who just left |
+| Queue order | Closest first (largest box), re-checked every time | Prioritize people near the booth |
 | Between greetings | At least 2 s of idle | Make "moving on" visible |
 | Target lost mid-greeting | Not seen for 2 s → end the greeting, mark as greeted | Don't wave at empty space |
 | Forget a track | Not seen for 3 s | Survive flicker and brief occlusion |
@@ -248,7 +249,7 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 
 | Requirement | Implementation | Where |
 |---|---|---|
-| **11** Look for people and orient towards them | effdet0 via the `people_detector` vision service. Each box becomes a bearing, then a base angle, smoothed every tick. | `detect_person.py`, `greeter.py` (`desired_pose`) |
+| **11** Look for people and orient toward them | effdet0 via the `people_detector` vision service. Each box becomes a bearing, then a base angle, smoothed every tick. | `detect_person.py`, `greeter.py` (`desired_pose`) |
 | **2** Hold on a person | Point (2.5 s), then two beckons, then two waves, about 17 s per person, while the base follows them | `greeter.py`, `gestures.py` |
 | **3** Sensible when nobody is there | Slow scanning idle that never repeats exactly. Resumes from wherever the arm is. | `gestures.idle_pose`, `Greeter.start_idle` |
 | **3** Robust to dropouts and flicker | 3-frame confirmation, 3 s track memory, 2 s loss tolerance mid-greeting. Detection errors are logged and the loop continues. | `tracking.py`, `Greeter.perceive` |
@@ -303,7 +304,7 @@ Configure these in the Viam app (**CONFIGURE** tab). The code looks resources up
 | `people_model` | ML model | **TFLite CPU**, deploying the **effdet0** model from the registry |
 | `people_detector` | Vision | **`vision/mlmodel`** block. ML model: `people_model`, default camera: `cam` |
 | `arm-1` | Arm | Simulated SO-101 (from the `devrel/so101-arm` module) |
-| `arm-SO101-real` | Arm | *Optional.* Physical SO-101 (same module); see [§9.3](#93-final-real-arm-settings) |
+| `arm-SO101-real` | Arm | *Optional.* Physical SO-101 (same module); see [§9.4](#94-final-real-arm-settings) |
 
 <!-- Recommended: export the machine config JSON (minus secrets) and commit it, e.g. config/machine.json. -->
 
@@ -361,15 +362,40 @@ I initially expected the move from simulation to a real arm to need **some tunin
 
 | Symptom on the real SO-101 | Root cause | Fix |
 |---|---|---|
-| Very jittery; joints sometimes moved one at a time; slow | The motion loop sent a new target **10 times a second**. The simulated arm accepts each one instantly, but on the real arm each `MoveToJointPositions` is a complete move that starts and ends at rest. I measured a median of **258 ms per command**, so only 17 of 40 commands were sent in a 4 s wave, each a stop-start. | Added a **`streamed`** motion mode: the same poses are sent as one continuous, **timestamped trajectory** (`move_through_joint_positions_streamed`), 0.3 s ahead. The arm moves through them without stopping. A lag test showed the real arm follows the stream within **0.15–0.2 s**, with no backlog. |
+| **Very jerky motion**: the servos started and stopped several times a second, joints sometimes moved one at a time, and gestures ran slowly | The motion loop sent a new target **10 times a second** with `move_to_joint_positions`. The simulated arm accepts each one instantly, but on the real arm each call is a complete move that starts and ends at rest. I measured a median of **258 ms per command**, so only 17 of 40 commands were sent in a 4 s wave, each one a stop-start. | Switched the real arm to `move_through_joint_positions_streamed`: one continuous, timestamped trajectory. See [§9.2](#92-how-motion-reaches-the-arm-simulation-vs-real). |
 | The arm module kept **dropping bytes** from the servos (`communication error during sync_read: read 40 of 48 expected bytes`), and joint reads and moves failed | **USB contention.** The webcam was plugged into the **same USB dongle** as the arm's serial adapter. The 1080p video stream filled the shared USB link, so replies from the servo bus arrived incomplete and the module timed out. The servo bus was the victim, not the cause. | Moved the webcam to **its own USB port**, and the errors stopped. Hardware layout matters as much as code. |
 | Greeter **crashed** after one of those bus errors | My bug: after a failed move, the recovery code (`stop()`, then re-reading the joints) went to the same failing bus, and nothing caught its exception | Recovery now never raises, backs off as failures repeat, and retries reading the start pose. Tested with a fake arm where 30% of calls fail. |
 | Shaking at the top of the wave | With the arm straight up, gravity puts almost no load on the servos, so **gear backlash** rattles over a long lever | A real-arm-only **bent-elbow wave pose**: forearm tilted forward, hand still up |
 | The hand looked wrong | Wrist roll zero differs between the simulated and real arm | Wrist roll for each arm: 90° in simulation, 0° on the real arm |
 
-All real-arm differences are keyed to the **arm name** (`HAND_ROLL_BY_ARM`, `WAVE_RAISED_BY_ARM`, `MOTION_BY_ARM` in `greeter.py`). The simulated arm keeps its original behaviour, and `GREETER_ARM` is the only switch.
+All real-arm differences are keyed to the **arm name** (`HAND_ROLL_BY_ARM`, `WAVE_RAISED_BY_ARM`, `MOTION_BY_ARM` in `greeter.py`). The simulated arm keeps its original behavior, and `GREETER_ARM` is the only switch.
 
-### 9.2 Lessons
+### 9.2 How motion reaches the arm: simulation vs. real
+
+This was the structural change. The gestures, state machine, tracking and pose calculation are **identical** for both arms; only the final step, how each pose is sent to the arm, differs.
+
+| | Simulated arm (`steps` mode) | Real SO-101 (`streamed` mode) |
+|---|---|---|
+| **SDK call** | `arm.move_to_joint_positions(...)`, called again every 0.1 s | `arm.move_through_joint_positions_streamed(...)`, one call kept open for the whole run |
+| **What each pose becomes** | A separate "go to these joint angles" command | An `Arm.TrajectoryPoint` with a timestamp 0.3 s ahead (`STREAM_LEAD_S`) |
+| **Code** | `Greeter.move()` | `Greeter.move_streamed()` |
+| **Selected by** | Default for any arm | `MOTION_BY_ARM = {"arm-SO101-real": "streamed"}`; override with `GREETER_MOTION` |
+
+**Why the simulated arm uses `move_to_joint_positions`:** it's the simplest call, and the simulated arm accepts each command instantly, so ten small moves a second look perfectly smooth in the 3D scene.
+
+**Why that failed on the real arm:** on the physical SO-101, every `move_to_joint_positions` is a complete move. The servos accelerate, slow down, **stop**, and only then report done. Sending one every 0.1 s made the servos **start and stop several times a second**, which produced **very jerky motion**, and each command took about 258 ms, so the gestures also ran slowly.
+
+**The three options I compared on the real arm:**
+
+| Option | Result |
+|---|---|
+| `move_to_joint_positions`, 10 times a second | Jerky stop-start motion and slow gestures (measured above) |
+| `move_through_joint_positions`, the whole wave as one waypoint list | Much smoother, because the module doesn't stop at each waypoint. But a plain waypoint list has **no timing**: the arm ran a 4 s wave in 2.6 s at its own speed. The list is also fixed before it starts, so the base can't keep tracking a moving person. |
+| **`move_through_joint_positions_streamed`**, timestamped points generated live | **Chosen.** Smooth, because the servos never stop between points. It keeps the gesture's timing, because each point has a timestamp. And the base keeps tracking the person, because points are computed from the latest detections as the stream runs. A lag test showed the real arm follows the stream within **0.15–0.2 s**, with no backlog. |
+
+**Module settings tuned alongside:** on the arm module in the Viam app (not in the code), `speed_degs_per_sec: 120`, `acceleration_degs_per_sec_per_sec: 500` and `waypoint_lookahead_deg: 20`. The lookahead controls how far ahead of the arm the module writes the next servo goal during a waypoint stream. A larger value means the servos never slow down to wait for the next point (see [§9.4](#94-final-real-arm-settings)).
+
+### 9.3 Lessons
 
 - A simulation hides assumptions. Here it hid **command rate, bus bandwidth and acceleration**. The simulated arm also ignored speed limits, which hid how fast I was really driving it.
 - On real hardware, prefer **fewer, richer commands** (timed trajectories) over many small ones.
@@ -378,7 +404,7 @@ All real-arm differences are keyed to the **arm name** (`HAND_ROLL_BY_ARM`, `WAV
 - Check the **module and server logs** (`viam-agent`), not only the client error. They pointed at the servo bus.
 - Keep the simulated arm configured next to the real one, so changes can always be checked against simulation.
 
-### 9.3 Final real-arm settings
+### 9.4 Final real-arm settings
 
 SO-101 arm module attributes that gave the best motion:
 
@@ -393,7 +419,7 @@ SO-101 arm module attributes that gave the best motion:
 
 The port varies by machine. The remaining fine shimmer comes from the hobby servos themselves, which only accept goal positions and have some gear backlash.
 
-### 9.4 What I'd do differently on a real arm
+### 9.5 What I'd do differently on a real arm
 
 - **Measure where the camera is instead of assuming it.** Record its pose in Viam's frame system and use the measured offset and rotation in the mapping. Ideally move the camera off the arm's axis or up higher, so the arm never blocks its view of the person mid-gesture.
 - **Safety first:**
@@ -415,10 +441,10 @@ Known gaps in the current version, and how I'd address each with more time or re
 |---|---|---|
 | **Losing or swapping people who cross paths.** Tracks are matched only by bearing (direction). | When two people cross, their identities can swap: Greeter may switch to the wrong person mid-greeting, or think the greeted person is new. | **Remember what each person looks like**, such as a face or clothing appearance embedding, and match on that as well as position (re-identification). This is more intensive than I first expected: it needs an extra model running on every detection, storage for everyone who has appeared, and care around privacy at a public event. A cheaper first step is matching on box overlap (IoU) with a Kalman filter that predicts each person's motion, which handles most crossings. |
 | **Re-greeting someone who lingers.** A track is forgotten after 3 s without detections. | A person standing still whose detection drops out briefly (bad angle, occlusion) can be greeted again. | Keep greeted tracks much longer than ungreeted ones. Re-identification (above) solves it properly. |
-| **Direction but no distance.** One webcam gives no depth, so only the base aims. | The arm points towards a person but not at their height or distance. Box size is a rough stand-in for distance, so a tall adult far away can rank as "closer" than a child near the booth. | Use the elevation (already computed) to aim the shoulder and wrist pitch, or add a **depth camera** for true 3D positions and distance-based priorities. |
+| **Direction but no distance.** One webcam gives no depth, so only the base aims. | The arm points toward a person but not at their height or distance. Box size is a rough stand-in for distance, so a tall adult far away can rank as "closer" than a child near the booth. | Use the elevation (already computed) to aim the shoulder and wrist pitch, or add a **depth camera** for true 3D positions and distance-based priorities. |
 | **Camera placement is assumed, not measured.** | Any offset or rotation between the camera and the arm's 0° becomes an aiming error on real hardware. | Record the camera's pose in Viam's **frame system** and transform bearings through it. Add a short calibration step (stand at a marked spot and confirm the arm points there). |
 | **The arm can block the camera.** On the real arm, gestures pass in front of a base-mounted camera. | Detections can drop or jump mid-gesture, so tracking may briefly freeze. | Mount the camera higher or off to one side (with the offset in the frame system), or ignore detections in the image region the arm covers during a gesture. |
-| **Closest-first can make people wait a long time.** | In a crowd, someone further away may never reach the front of the queue. | Score the queue on proximity **and** waiting time, and favour people approaching the booth (box growing) over people walking past. |
+| **Closest-first can make people wait a long time.** | In a crowd, someone farther away may never reach the front of the queue. | Score the queue on proximity **and** waiting time, and favor people approaching the booth (box growing) over people walking past. |
 | **Sensitive to USB layout.** A camera sharing a USB dongle or hub with the servo adapter filled the shared link and made the arm module drop bytes. | On a different laptop or booth setup the arm could fail again, with an error that points at the servos rather than the camera. | Document the required wiring (camera and servo adapter on separate USB controllers, or a powered hub), lower the camera resolution (Greeter doesn't need 1080p), and watch for the module's `sync_read` errors so the problem shows up immediately instead of as jitter. |
 | **Real-arm motion is at the hardware's limit.** | Some fine shimmer remains on the SO-101's hobby servos, and the fastest transition (~91°/s) is near its speed cap. | Generate smoother trajectories (splines), check each one against the configured speed and acceleration before sending, or use higher-quality servos. |
 | **False positives from static people-like objects.** | A poster or mannequin detected as a person would be greeted. | Ignore tracks that never move, or require some motion before a track becomes eligible. |
@@ -436,7 +462,7 @@ Known gaps in the current version, and how I'd address each with more time or re
 - [ ] Give priority to people *approaching* the booth (box growing) over people walking past
 - [ ] Ignore detections in image regions the arm covers during a gesture
 
-**Aiming and behaviour**
+**Aiming and behavior**
 - [ ] Use elevation and box size to aim the shoulder and wrist at the person's height and distance
 - [ ] Add a depth camera for true 3D positions
 - [ ] Read the camera's pose from Viam's frame system instead of assuming it
