@@ -34,18 +34,18 @@ Using the Viam Python SDK, write a script with a control loop that lets Greeter:
 
 |  | Requirements |
 |---|---|
-| .1 | Look for people using the camera and a machine learning model, and orient the arm toward them |
-| .2 | Hold on a person for a moment so they feel acknowledged |
-| .3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
-| .4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
+| 1. | Look for people using the camera and a machine learning model, and orient the arm toward them |
+| 2. | Hold on a person for a moment so they feel acknowledged |
+| 3. | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
+| 4. | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
 
 The README must also state:
 
 |  | Question | *Link to Answer* |
 |---|---|---|
-| Q1 | Where the camera sits relative to the arm | [§5.1](#51-camera-placement) |
-| Q2 | How a detection in the image maps to an arm command, and why | [§5.2](#52-mapping-a-detection-to-an-arm-command) |
-| Q3 | What I'd do differently on a real arm | [§9](#9-moving-to-a-real-robot) |
+| Q1. | Where the camera sits relative to the arm | [§5.1](#51-camera-placement) |
+| Q2. | How a detection in the image maps to an arm command, and why | [§5.2](#52-mapping-a-detection-to-an-arm-command) |
+| Q3. | What I'd do differently on a real arm | [§9](#9-moving-to-a-real-robot) |
 
 **Additional Goals and Creative Freedom:** make the greeting clear and inviting to a passerby (point, then beckon, then wave), keep every motion smooth, add in a gentle swaying idle sequence, and structure the code so that it could become a deployable Viam module.
 
@@ -53,11 +53,19 @@ The README must also state:
 
 ## 2. Approach
 
+<p align="center">
+  <img src="media/images/notebook.jpg" alt="Notebook pages: problem statement, goals, required deliverables, and a sketch of the camera-at-base setup" width="640">
+  <br>
+  <em>From my notebook: the problem statement, goals and required deliverables (left); the camera mounted at the arm's base with the world axes, people with bounding boxes, and the initial greeting idea (right).</em>
+</p>
+
 My approach to problem-solving is to break a problem down into its simplest components and build up from there. I start by defining the problem statement and identifying the required deliverables, such as this README and a justification for the camera placement. I then identify smaller, manageable tasks and sketch out the system, whether through a block diagram of the control scheme or a drawing of the physical setup.
 
 With a clearer understanding of the problem and its components, I brainstorm potential solutions for each task, identifying areas where I have creative freedom. I also research existing approaches and evaluate the resources available to me. For this project, that meant assessing the available hardware and exploring the software tools and built-in packages provided by the Viam SDK to determine how best to implement the system.
 
 As I experiment with different approaches, I keep a notebook nearby to document my thought process, record assumptions, and track unresolved questions, shortcomings, and challenges that may require further investigation. This helps me evaluate my decisions, identify areas for improvement, and keep track of issues to revisit as the project evolves.
+
+My overall approach to each of these stages has been outlined in this README. 
 
 Greeter left a lot of room for creative freedom:
 
@@ -68,17 +76,11 @@ Greeter left a lot of room for creative freedom:
 - how to handle several people in view at once
 - how to compute trajectories and command the arm to follow them
 
-<p align="center">
-  <img src="media/images/notebook.jpg" alt="Notebook pages: problem statement, goals, required deliverables, and a sketch of the camera-at-base setup" width="640">
-  <br>
-  <em>From my notebook: the problem statement, goals and required deliverables (left); the camera mounted at the arm's base with the world axes, people with bounding boxes, and the initial greeting idea (right).</em>
-</p>
-
-The process I followed, transferred from my notebook, went in stages, each tested on the machine before moving on:
+The process I followed was broken down into the following stages:
 
 1. **Detection.** Configure the webcam and the effdet0 people detector, then turn bounding boxes into directions in the robot's frame (`detect_person.py`).
-2. **Tracking test.** Turn only the base joint toward the closest person, to check the whole chain from camera to arm (a standalone test script, kept as a local tool and not part of this repo).
-3. **Behavior.** Design the gestures as functions of time, add a state machine and a tracker with a queue, and tune the motion in the 3D scene (`greeter.py`, `gestures.py`, `tracking.py`).
+2. **Tracking Test.** Turn only the base joint toward the closest person, to check the whole chain from camera to arm (a standalone test script, kept as a local tool and not part of this repo).
+3. **Behavior.** Design the gestures (*idle*, *point*, *beckon*, and *wave*) as functions of time, add a state machine and a tracker with a queue, and tune the motion in the 3D scene (`greeter.py`, `gestures.py`, `tracking.py`).
 4. **Real hardware.** Port to a physical SO-101, diagnose the gap between simulation and the real arm, and restructure how motion reaches the arm (see [§9](#9-moving-to-a-real-robot)).
 
 > **[Your notes]** *What I'd tell another developer learning this, and where I got stuck.*
