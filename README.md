@@ -47,13 +47,17 @@ The README must also state:
 | Q2 | How a detection in the image maps to an arm command, and why | [§5.2](#52-mapping-a-detection-to-an-arm-command) |
 | Q3 | What I'd do differently on a real arm | [§9](#9-moving-to-a-real-robot) |
 
-**My goals beyond the brief:** make the greeting read clearly to a passerby (point, then beckon, then wave), keep every motion smooth, add in a gentle swaying idle sequence, and make the code structured so it could become a deployable Viam module.
+**Additional Goals and Creative Freedom:** make the greeting clear and inviting to a passerby (point, then beckon, then wave), keep every motion smooth, add in a gentle swaying idle sequence, and structure the code so that it could become a deployable Viam module.
 
 ---
 
 ## 2. Approach
 
-My approach is to break a problem down into its simplest components and build up from there. I start by writing out the problem statement, then turn it into specific goals and the deliverables that must be included (for example, this README and a justification for the camera placement). Next, I sketch the system, whether that's a block diagram of the control scheme or a drawing of the physical setup. With the problem broken down, I brainstorm and note ideas for how to tackle each part.
+My approach to problem-solving is to break a problem down into its simplest components and build up from there. I start by defining the problem statement and identifying the required deliverables, such as this README and a justification for the camera placement. I then identify smaller, manageable tasks and sketch out the system, whether through a block diagram of the control scheme or a drawing of the physical setup.
+
+With a clearer understanding of the problem and its components, I brainstorm potential solutions for each task, identifying areas where I have creative freedom. I also research existing approaches and evaluate the resources available to me. For this project, that meant assessing the available hardware and exploring the software tools and built-in packages provided by the Viam SDK to determine how best to implement the system.
+
+As I experiment with different approaches, I keep a notebook nearby to document my thought process, record assumptions, and track unresolved questions, shortcomings, and challenges that may require further investigation. This helps me evaluate my decisions, identify areas for improvement, and keep track of issues to revisit as the project evolves.
 
 Greeter left a lot of room for creative freedom:
 
@@ -63,8 +67,6 @@ Greeter left a lot of room for creative freedom:
 - which ML model to use for detecting people
 - how to handle several people in view at once
 - how to compute trajectories and command the arm to follow them
-
-That freedom gave me space to explore, and it led to a greeting sequence designed to read clearly to a passerby: **idle → point → beckon → wave → idle**.
 
 <p align="center">
   <img src="media/images/notebook.jpg" alt="Notebook pages: problem statement, goals, required deliverables, and a sketch of the camera-at-base setup" width="640">
@@ -249,7 +251,7 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 
 | Requirement | Implementation | Where |
 |---|---|---|
-| **11** Look for people and orient toward them | effdet0 via the `people_detector` vision service. Each box becomes a bearing, then a base angle, smoothed every tick. | `detect_person.py`, `greeter.py` (`desired_pose`) |
+| **1** Look for people and orient toward them | effdet0 via the `people_detector` vision service. Each box becomes a bearing, then a base angle, smoothed every tick. | `detect_person.py`, `greeter.py` (`desired_pose`) |
 | **2** Hold on a person | Point (2.5 s), then two beckons, then two waves, about 17 s per person, while the base follows them | `greeter.py`, `gestures.py` |
 | **3** Sensible when nobody is there | Slow scanning idle that never repeats exactly. Resumes from wherever the arm is. | `gestures.idle_pose`, `Greeter.start_idle` |
 | **3** Robust to dropouts and flicker | 3-frame confirmation, 3 s track memory, 2 s loss tolerance mid-greeting. Detection errors are logged and the loop continues. | `tracking.py`, `Greeter.perceive` |
