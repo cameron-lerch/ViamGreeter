@@ -12,16 +12,16 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be cho
 
 ## Table of contents
 
-1. [Problem statement and goals](#1-problem-statement-and-goals)
+1. [Problem Statement and Goals](#1-problem-statement-and-goals)
 2. [Approach](#2-approach)
 3. [Demo](#3-demo)
-4. [System architecture](#4-system-architecture)
-5. [Design decisions](#5-design-decisions)
-6. [How the requirements are met](#6-how-the-requirements-are-met)
-7. [Repository structure](#7-repository-structure)
-8. [Setup and usage](#8-setup-and-usage)
-9. [Moving to a real robot](#9-moving-to-a-real-robot)
-10. [Shortcomings and proposed solutions](#10-shortcomings-and-proposed-solutions)
+4. [System Architecture](#4-system-architecture)
+5. [Design Decisions](#5-design-decisions)
+6. [How the Requirements are Met](#6-how-the-requirements-are-met)
+7. [Repository Structure](#7-repository-structure)
+8. [Setup and Usage](#8-setup-and-usage)
+9. [Working with a Real Arm](#9-moving-to-a-real-robot)
+10. [Shortcomings and Proposed Solutions](#10-shortcomings-and-proposed-solutions)
 11. [Future improvements](#11-future-improvements)
 
 ---
@@ -32,16 +32,16 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be cho
 
 Using the Viam Python SDK, write a script with a control loop that lets Greeter:
 
-| # | Requirements |
+|  | Requirements |
 |---|---|
-| Req.1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
-| Req.2 | Hold on a person for a moment so they feel acknowledged |
-| Req.3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
-| Req.4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
+| .1 | Look for people using the camera and a machine learning model, and orient the arm towards them |
+| .2 | Hold on a person for a moment so they feel acknowledged |
+| .3 | Behave sensibly when nobody is walking by, and keep running when detections drop out or flicker |
+| .4 | Try not to get stuck or crash when asked to move somewhere the arm can't reach |
 
 The README must also state:
 
-| # | Question | Answered in |
+|  | Question | *Link to Answer* |
 |---|---|---|
 | Q1 | Where the camera sits relative to the arm | [§5.1](#51-camera-placement) |
 | Q2 | How a detection in the image maps to an arm command, and why | [§5.2](#52-mapping-a-detection-to-an-arm-command) |
@@ -109,13 +109,13 @@ Throughout the greeting, the base **keeps tracking the person** as they move.
 
 > **[Your thoughts]** *Add your own commentary on the simulation run: what you were testing, what you're pleased with, what you'd tune.*
 
-### Real SO-101
+### Real SO-101 Arm
 
-[Real SO-101](https://github.com/user-attachments/assets/657e7ac3-a07f-4b7f-a611-5bbc258ccf20)
+[Real SO-101 Arm](https://github.com/user-attachments/assets/657e7ac3-a07f-4b7f-a611-5bbc258ccf20)
 
 **[Watch the real-arm demo](media/videos/greeter_real.mp4)** (`media/videos/greeter_real.mp4`)
 
-The physical SO-101 runs the same Greeter behaviour (idle, point, beckon, wave, back to idle), driven by the same code. The differences are the real-arm settings described in [§9](#9-moving-to-a-real-robot):
+The physical SO-101 runs the same Greeter behavior (idle, point, beckon, wave, back to idle), driven by the same code. The differences are the real-arm settings described in [§9](#9-moving-to-a-real-robot):
 - motion is **streamed** as one continuous, timed trajectory instead of separate moves;
 - the wave uses a **bent-elbow pose** to reduce servo rattle;
 - the wrist roll is set to make the gripper read as a hand.
@@ -126,9 +126,9 @@ Some fine shimmer remains; that's the limit of the hobby servos (see [§9.3](#93
 
 ---
 
-## 4. System architecture
+## 4. System Architecture
 
-### 4.1 Block diagram
+### 4.1 Block Diagram
 
 ```mermaid
 flowchart LR
@@ -163,7 +163,7 @@ Two loops run at the same time in one asyncio program:
 - **Perception (~6 Hz):** camera → detector → tracker. The camera is fixed, so it keeps watching while the arm moves.
 - **Motion (10 Hz):** the state machine picks the active motion, samples it at the current time, blends across switches, clamps to joint limits, and sends the pose to the arm.
 
-### 4.2 Behaviour state machine
+### 4.2 Behaviour State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -188,9 +188,9 @@ In every greeting state, the base keeps following the person as they walk.
 
 ---
 
-## 5. Design decisions
+## 5. Design Decisions
 
-### 5.1 Camera placement
+### 5.1 Camera Placement
 
 **Assumption:** the webcam is mounted **at the base of the arm, fixed to the pedestal** (it doesn't rotate with joint 1), with its optical axis along the arm's **+x** direction (base 0°) and its image "up" along +z.
 
@@ -200,7 +200,7 @@ Why a fixed camera instead of one on the wrist:
 - **It keeps watching while greeting.** Greeter can follow the current person and queue up the next one *while* it waves.
 - **It's simpler.** There's no need to model a moving viewpoint or to keep an estimate of every person's position while the camera moves.
 
-### 5.2 Mapping a detection to an arm command
+### 5.2 Mapping a Detection to an Arm Command
 
 Each person's bounding-box centre `(u, v)` becomes a **bearing** with a pinhole camera model. The focal length in pixels comes from the camera's horizontal field of view (`CAMERA_HFOV_DEG`, 70° for a Logitech C920 at 16:9):
 
@@ -218,7 +218,7 @@ The base joint's sign was measured on the arm: at base +30°, the end of the arm
 - **It works with any resolution or camera.** Image size is read from every frame, so a different camera only needs its field of view (and `MIRRORED`, if the image is flipped).
 - **Joint space instead of Cartesian targets.** A single webcam gives direction but no distance, so a 3D target position would be invented. Commanding joint angles directly avoids inverse kinematics and motion-planning failures. After clamping to the joint limits, every command is reachable by construction.
 
-### 5.3 Motions as functions of time
+### 5.3 Motions as Functions of Time
 
 Idle, point, beckon and wave are each a plain function `pose = f(t)` in `gestures.py`. Ten times a second, the controller asks the active motion where the arm should be *now*. This gives:
 
@@ -228,7 +228,7 @@ Idle, point, beckon and wave are each a plain function `pose = f(t)` in `gesture
 - **Safety in one place.** Every pose passes through `clamp_pose()`: joint limits from the arm's kinematics, minus a 5° margin, with the shoulder further capped so the arm never reaches down into the table. 
 - **Speeds checked offline.** Each gesture is designed to stay under the arm's speed limit.
 
-### 5.4 Tracking and the greeting queue
+### 5.4 Tracking and Greeting Queue
 
 The detector only reports "a person at this bearing" each frame; it doesn't know *which* person. `tracking.py` gives people an identity by matching each frame's detections to existing tracks by nearest bearing (within 12°).
 
@@ -244,7 +244,7 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 
 ---
 
-## 6. How the requirements are met
+## 6. How the Requirements are Met
 
 | Requirement | Implementation | Where |
 |---|---|---|
@@ -259,7 +259,7 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 
 ---
 
-## 7. Repository structure
+## 7. Repository Structure
 
 ```
 ViamGreeter/
