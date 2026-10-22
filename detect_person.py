@@ -2,8 +2,8 @@
 Person detection for the ViamGreeter robot.
 
 Pulls frames from the webcam through a Viam vision service running a pre-trained
-people detector (the effdet0 EfficientDet model on the TFLite CPU ML model
-service "people_model", wrapped by the mlmodel vision service "people_detector"),
+people detector (the EfficientDet-COCO model by viam-labs on the TFLite CPU ML
+model service "people_model", wrapped by the mlmodel vision service "people_detector"),
 keeps only the
 "person" detections, and converts each bounding box into a direction in the
 robot's world frame.
@@ -31,7 +31,7 @@ CAMERA_NAME = "cam"
 CAMERA_HFOV_DEG = 70.0   # typical laptop webcam; measure yours for better aim
 MIRRORED = False         # set True if the webcam feed is horizontally flipped
 MIN_CONFIDENCE = 0.5
-PERSON_LABEL = "person"  # compared case-insensitively (effdet0 reports "Person")
+PERSON_LABEL = "person"  # compared case-insensitively (EfficientDet-COCO reports "Person")
 
 
 @dataclass
