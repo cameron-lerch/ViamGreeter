@@ -1,18 +1,17 @@
 '''
-Greeter: notices people walking by the booth, turns to them, waves, beckons
-them over, then goes back to idling until the next new person shows up.
+Greeter: notices people walking by the booth, turns to them, beckons
+them over, waves, then goes back to idling until the next new person shows up.
 
 Two concurrent loops share state:
   - perception (~6 Hz): camera -> people detector -> PeopleTracker. The camera
     is fixed at the arm's base, so it keeps watching while the arm moves.
   - motion (10 Hz): a small state machine picks the active motion, samples it
-    at the current time, smooths the trajectory across switches, clamps to joint limits, and
-    sends the pose to the arm.
+    at the current time, smooths the trajectory across switches, clamps to joint 
+    limits, and sends the pose to the arm.
 
 Greeter follows the following sequence: 
-  idle -> (new confirmed person)-> point -> beckon -> wave --
-  -> move to next person in the queue or idle
-  (person leaves early: cut the greeting short and go back to idle)
+  idle -> (new confirmed person)-> point -> beckon -> wave -> idle (or next person)
+  (if a person leaves early: cut the greeting short and go back to idle)
 
 Run:  python greeter.py   (watch the arm in the app's 3D scene; Ctrl-C stops)
 '''
@@ -34,21 +33,21 @@ from tracking import PeopleTracker
 ARM_NAME = os.environ.get("GREETER_ARM", "arm-1")               # set in .env; "arm-1" is the simulated arm
 SPEED    = float(os.environ.get("GREETER_SPEED", "1.0"))        # scales how quickly the motions are carried out, used to slow down when first testing on the real arm.
 HAND_ROLL_BY_ARM = {"arm-SO101-real": 0.0}                      # wrist roll changes from simulated arm to real arm, simulated = 90deg, real = 0deg
-ROLL_OFFSET = HAND_ROLL_BY_ARM.get(ARM_NAME, gestures.HAND_ROLL) - gestures.HAND_ROLL
+ROLL_OFFSET = HAND_ROLL_BY_ARM.get(ARM_NAME, gestures.HAND_ROLL) - gestures.HAND_ROLL   # offset needed for the real arm wrist joint
 WAVE_RAISED_BY_ARM = {"arm-SO101-real": [-15.0, -50.0, -25.0]}  # [shoulder, elbow, wrist pitch], tuned so that the real arm extends less than the simulated arm to avoid shaking
 WAVE_OFFSET = [want - base for want, base in
-               zip(WAVE_RAISED_BY_ARM.get(ARM_NAME, gestures.RAISED[1:4]), gestures.RAISED[1:4])]
+               zip(WAVE_RAISED_BY_ARM.get(ARM_NAME, gestures.RAISED[1:4]), gestures.RAISED[1:4])]   # offset to keep the real arm more stable
 MOTION_BY_ARM = {"arm-SO101-real": "streamed"}                  # the real arm requires different motion commands than the simulated arm to avoid jerky behavior
 MOTION = MOTION_BY_ARM.get(ARM_NAME, "steps")                    # any other arm (e.g. the simulated arm) uses steps
 
-TICK_S = 0.1              # 10 Hz motion loopfor the simulated arm
-STREAM_LEAD_S = 0.3       # how far ahead we compute joint positions for the streamed motion commands for the real arm
+TICK_S = 0.1              # motion loop period (10 Hz): one move per tick on the simulated arm, one trajectory point per tick on the real arm
+STREAM_LEAD_S = 0.3       # each streamed point is timestamped this far ahead, so the real arm always has ~3 points queued
 TRANSITION_S  = 1.5       # trajectory smoothing time whenever the active gesture changes
-WAVE_SMOOTH_S = 1.2       # smoother transition between the beckon and the wave
+WAVE_SMOOTH_S = 1.2       # smoother (shorter) transition between the beckon and the wave
 POINT_S  = 2.5            # duration for pointing at a person
 BECKON_S = TRANSITION_S + 2 * gestures.BECKON_PERIOD_S    # total duration for the beckon, with time for smoothing
 WAVE_S   = WAVE_SMOOTH_S + 2 * gestures.WAVE_PERIOD_S     # total duration for the wave, with time for smoothing
-MIN_IDLE_S  = 2.0         # idle at least this long between greetings as to not rapidly jump from person to person
+MIN_IDLE_S  = 2.0         # idle at least this long between greetings to avoid rapidly jumping from person to person
 LOST_S      = 2.0         # end a greeting early once the target is gone this long
 BASE_FOLLOW = 0.2         # per-tick smoothing of the base toward the person's bearing
 

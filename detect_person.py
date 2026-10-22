@@ -28,7 +28,7 @@ from viam.services.vision import VisionClient
 
 VISION_NAME = "people_detector"
 CAMERA_NAME = "cam"
-CAMERA_HFOV_DEG = 70.0   # typical laptop webcam; measure yours for better aim
+CAMERA_HFOV_DEG = 70.0   # horizontal field of view of the camera (70 deg is good for most webcams)
 MIRRORED = False         # set True if the webcam feed is horizontally flipped
 MIN_CONFIDENCE = 0.5
 PERSON_LABEL = "person"  # compared case-insensitively (EfficientDet-COCO reports "Person")
@@ -127,7 +127,7 @@ async def main():
                 f"elev {p.elevation_deg:+5.1f}° size {p.size:.2f}"
                 for p in people) or "no one"
             print(f"[{latency_ms:5.0f} ms] {summary}")
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.2)    # sleep for the viewer only, not used within the perception loop
 
 
 if __name__ == "__main__":

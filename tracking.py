@@ -60,7 +60,7 @@ class PeopleTracker:
         return next((t for t in self.tracks if t.id == track_id), None)
 
     def next_target(self, now: float) -> Track | None:
-        '''Closest confirmed, not-yet-greeted person currently in view.'''
+        ''' Closest confirmed, not-yet-greeted person currently in view. '''
         queue = [t for t in self.tracks
                  if t.confirmed and not t.greeted and now - t.last_seen <= FRESH_S]
         return max(queue, key=lambda t: t.size, default=None)
