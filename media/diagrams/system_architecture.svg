@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="660" viewBox="0 0 1320 660" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A5568"/>
+    </marker>
+    <style>
+      .title { font-size: 26px; font-weight: 700; fill: #1F2933; }
+      .group { font-size: 17px; font-weight: 700; fill: #3E4C59; }
+      .lane { font-size: 14px; font-weight: 700; fill: #616E7C; letter-spacing: 0.5px; }
+      .name { font-size: 17px; font-weight: 700; fill: #1F2933; }
+      .file { font-size: 13px; fill: #3E4C59; font-family: Liberation Mono, Menlo, Consolas, monospace; }
+      .desc { font-size: 13px; fill: #52606D; }
+      .label { font-size: 12.5px; fill: #3E4C59; }
+      .mono { font-size: 12.5px; fill: #1F2933; font-family: Liberation Mono, Menlo, Consolas, monospace; }
+      .edge { stroke: #4A5568; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1320" height="660" rx="16" fill="#FFFFFF"/>
+  <text x="660" y="40" text-anchor="middle" class="title">ViamGreeter: system architecture</text>
+
+  <!-- Viam machine group -->
+  <rect x="30" y="66" width="440" height="560" rx="14" fill="#F3F6FC" stroke="#9FB3D9" stroke-width="1.5"/>
+  <text x="50" y="94" class="group">Viam machine (viam-server)</text>
+
+  <rect x="50" y="116" width="180" height="78" rx="10" fill="#E3ECFC" stroke="#3B6FD8" stroke-width="1.5"/>
+  <text x="140" y="145" text-anchor="middle" class="name">Camera</text>
+  <text x="140" y="166" text-anchor="middle" class="file">cam</text>
+  <text x="140" y="184" text-anchor="middle" class="desc">webcam</text>
+
+  <rect x="250" y="116" width="200" height="78" rx="10" fill="#E3ECFC" stroke="#3B6FD8" stroke-width="1.5"/>
+  <text x="350" y="145" text-anchor="middle" class="name">ML model service</text>
+  <text x="350" y="166" text-anchor="middle" class="file">people_model</text>
+  <text x="350" y="184" text-anchor="middle" class="desc">TFLite CPU · effdet0</text>
+
+  <rect x="95" y="262" width="310" height="84" rx="10" fill="#E3ECFC" stroke="#3B6FD8" stroke-width="1.5"/>
+  <text x="250" y="292" text-anchor="middle" class="name">Vision service</text>
+  <text x="250" y="313" text-anchor="middle" class="file">people_detector</text>
+  <text x="250" y="332" text-anchor="middle" class="desc">mlmodel: runs the model on camera frames</text>
+
+  <rect x="95" y="476" width="310" height="104" rx="10" fill="#E3ECFC" stroke="#3B6FD8" stroke-width="1.5"/>
+  <text x="250" y="508" text-anchor="middle" class="name">Arm (SO-101)</text>
+  <text x="250" y="534" text-anchor="middle" class="file">arm-1 (simulated)</text>
+  <text x="250" y="556" text-anchor="middle" class="file">arm-SO101-real (real)</text>
+
+  <path class="edge" d="M140,194 L140,260"/>
+  <path class="edge" d="M350,194 L350,260"/>
+
+  <!-- Script group -->
+  <rect x="560" y="66" width="730" height="560" rx="14" fill="#F2FAF4" stroke="#9CCFAE" stroke-width="1.5"/>
+  <text x="580" y="94" class="group">greeter.py: Python SDK script (two asyncio loops)</text>
+
+  <text x="590" y="126" class="lane">PERCEPTION LOOP · ~6 Hz</text>
+  <rect x="590" y="138" width="300" height="92" rx="10" fill="#E2F4E8" stroke="#2E8B57" stroke-width="1.5"/>
+  <text x="740" y="168" text-anchor="middle" class="name">PersonDetector</text>
+  <text x="740" y="190" text-anchor="middle" class="file">detect_person.py</text>
+  <text x="740" y="212" text-anchor="middle" class="desc">keep people · box center → bearing</text>
+
+  <rect x="960" y="138" width="300" height="92" rx="10" fill="#E2F4E8" stroke="#2E8B57" stroke-width="1.5"/>
+  <text x="1110" y="168" text-anchor="middle" class="name">PeopleTracker</text>
+  <text x="1110" y="190" text-anchor="middle" class="file">tracking.py</text>
+  <text x="1110" y="212" text-anchor="middle" class="desc">tracks · flicker filter · greeting queue</text>
+
+  <text x="590" y="296" class="lane">MOTION LOOP · 10 Hz</text>
+  <rect x="590" y="308" width="300" height="112" rx="10" fill="#E2F4E8" stroke="#2E8B57" stroke-width="1.5"/>
+  <text x="740" y="338" text-anchor="middle" class="name">Gestures</text>
+  <text x="740" y="360" text-anchor="middle" class="file">gestures.py</text>
+  <text x="740" y="382" text-anchor="middle" class="desc">idle · point · beckon · wave as pose = f(t)</text>
+  <text x="740" y="401" text-anchor="middle" class="desc">trajectory smoothing · clamp to limits</text>
+
+  <rect x="960" y="308" width="300" height="112" rx="10" fill="#E2F4E8" stroke="#2E8B57" stroke-width="1.5"/>
+  <text x="1110" y="338" text-anchor="middle" class="name">Greeter state machine</text>
+  <text x="1110" y="360" text-anchor="middle" class="file">greeter.py (main file)</text>
+  <text x="1110" y="382" text-anchor="middle" class="desc">manages the active gesture and when to switch,</text>
+  <text x="1110" y="401" text-anchor="middle" class="desc">based on camera feedback and timing</text>
+
+  <rect x="775" y="482" width="320" height="104" rx="10" fill="#FFF3E0" stroke="#E8890C" stroke-width="1.5"/>
+  <text x="935" y="512" text-anchor="middle" class="name">Send pose to arm</text>
+  <text x="935" y="534" text-anchor="middle" class="desc">motion mode chosen per arm:</text>
+  <text x="935" y="554" text-anchor="middle" class="desc">steps for the simulated arm</text>
+  <text x="935" y="572" text-anchor="middle" class="desc">streamed for the real arm</text>
+
+  <!-- Vision -> PersonDetector -->
+  <path class="edge" d="M405,304 L515,304 L515,184 L588,184"/>
+  <rect x="481" y="222" width="68" height="38" rx="4" fill="#FFFFFF"/>
+  <text x="515" y="238" text-anchor="middle" class="label">image +</text>
+  <text x="515" y="254" text-anchor="middle" class="label">detections</text>
+
+  <!-- PD -> TR -->
+  <path class="edge" d="M890,184 L958,184"/>
+  <text x="924" y="174" text-anchor="middle" class="label">bearings</text>
+
+  <!-- TR -> SM -->
+  <path class="edge" d="M1110,230 L1110,306"/>
+  <text x="1120" y="273" class="label">next person + bearing</text>
+
+  <!-- GE -> SM -->
+  <path class="edge" d="M890,364 L958,364"/>
+  <text x="924" y="354" text-anchor="middle" class="label">pose(t)</text>
+
+  <!-- SM -> OUT -->
+  <path class="edge" d="M1110,420 L1110,534 L1097,534"/>
+  <text x="1120" y="470" class="label">pose for now</text>
+
+  <!-- OUT -> ARM -->
+  <path class="edge" d="M775,508 L407,508"/>
+  <text x="590" y="499" text-anchor="middle" class="mono">move_to_joint_positions</text>
+  <text x="590" y="525" text-anchor="middle" class="label">simulated arm · one move every 0.1 s</text>
+  <path class="edge" d="M775,560 L407,560"/>
+  <text x="590" y="551" text-anchor="middle" class="mono">move_through_joint_positions_streamed</text>
+  <text x="590" y="577" text-anchor="middle" class="label">real arm · one continuous timed trajectory</text>
+</svg>
