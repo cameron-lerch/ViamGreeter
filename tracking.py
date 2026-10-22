@@ -46,7 +46,7 @@ class PeopleTracker:
 
     def update(self, people: list[Person], now: float) -> None:
         unmatched = list(self.tracks)
-        for p in people:  # largest first, so the closest people claim tracks first
+        for p in people:  # track the largest (closest) bounding box first
             best = min(unmatched, key=lambda t: abs(t.bearing_deg - p.bearing_deg), default=None)
             if best is not None and abs(best.bearing_deg - p.bearing_deg) <= MATCH_GATE_DEG:
                 best.bearing_deg, best.size, best.last_seen = p.bearing_deg, p.size, now

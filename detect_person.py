@@ -46,18 +46,18 @@ class Person:
 
     @property
     def size(self) -> float:
-        '''Box height as a fraction of the image: a rough proximity proxy (bigger is closer).'''
+        ''' Box height as a fraction of the image: a rough proximity proxy (bigger is closer). '''
         return self.height_frac
 
 
 def pixel_to_direction(u: float, v: float, width: int, height: int,
                        hfov_deg: float = CAMERA_HFOV_DEG,
                        mirrored: bool = MIRRORED) -> tuple[float, float]:
-    '''Map a pixel to (bearing_deg, elevation_deg) with a pinhole camera model.
+    ''' Map a pixel to (bearing_deg, elevation_deg) with a pinhole camera model.
 
-    The focal length in pixels comes from the horizontal field of view; square
-    pixels are assumed, so the same focal length applies vertically. Image +u
-    (right) is world -y and image +v (down) is world -z, hence the negations.
+        The focal length in pixels comes from the horizontal field of view; square
+        pixels are assumed, so the same focal length applies vertically. Image +u
+        (right) is world -y and image +v (down) is world -z, hence the negations.
     '''
     f_px = (width / 2) / math.tan(math.radians(hfov_deg) / 2)
     bearing = -math.degrees(math.atan2(u - width / 2, f_px))
@@ -74,10 +74,10 @@ class PersonDetector:
         self.min_confidence = min_confidence
 
     async def detect(self) -> list[Person]:
-        '''One frame's people, largest (likely closest) first.
+        ''' One frame's people, largest (likely closest) first.
 
-        Image and detections come back from the same capture, so the box pixel
-        coordinates always match the image size used to convert them.
+            Image and detections come back from the same capture, so the box pixel
+            coordinates always match the image size used to convert them.
         '''
         result = await self.vision.capture_all_from_camera(
             self.camera_name, return_image=True, return_detections=True, timeout=5,
