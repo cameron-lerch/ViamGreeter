@@ -39,7 +39,7 @@ WAVE_RAISED_BY_ARM = {"arm-SO101-real": [-15.0, -50.0, -25.0]}  # [shoulder, elb
 WAVE_OFFSET = [want - base for want, base in
                zip(WAVE_RAISED_BY_ARM.get(ARM_NAME, gestures.RAISED[1:4]), gestures.RAISED[1:4])]
 MOTION_BY_ARM = {"arm-SO101-real": "streamed"}                  # the real arm requires different motion commands than the simulated arm to avoid jerky behavior
-MOTION = os.environ.get("GREETER_MOTION", MOTION_BY_ARM.get(ARM_NAME, "steps"))
+MOTION = MOTION_BY_ARM.get(ARM_NAME, "steps")                    # any other arm (e.g. the simulated arm) uses steps
 
 TICK_S = 0.1              # 10 Hz motion loopfor the simulated arm
 STREAM_LEAD_S = 0.3       # how far ahead we compute joint positions for the streamed motion commands for the real arm
