@@ -15,7 +15,7 @@ async def connect() -> RobotClient:
     return await RobotClient.at_address(os.environ["VIAM_MACHINE_ADDRESS"], opts)
 
 async def main():
-    """Connection check: list every resource on the machine, grouped by type."""
+    """ Connection check: list every resource on the machine, grouped by type. """
     async with await connect() as machine:
         print(f"Connected to {os.environ['VIAM_MACHINE_ADDRESS']}")
         for rn in sorted(machine.resource_names, key=lambda r: (r.subtype, r.name)):

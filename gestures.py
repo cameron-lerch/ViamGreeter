@@ -35,7 +35,7 @@ RAISED = [0.0, -25.0, -55.0, -10.0, HAND_ROLL]     # forearm and hand pointing u
 REACH = [0.0, 5.0, 20.0, 10.0, HAND_ROLL]          # hand low and out toward the person
 
 WAVE_PERIOD_S = 2.0
-BECKON_PERIOD_S = 3.7    # the 70 deg wrist curl needs this long to stay under the ~60 deg/s cap
+BECKON_PERIOD_S = 3.7    # the 70 deg wrist curl needs this long to stay under the ~60 deg/s speed cap
 BECKON_CURL_DEG = 70.0   # wrist pitch travel: from +10 (pointing down) to -60 (pulled back up)
 IDLE_CYCLE_S = 126.0     # idle periods 14, 9 and 7 s line up every 126 s
 
@@ -52,6 +52,8 @@ def clamp_pose(pose: list[float]) -> list[float]:
 def smoothstep(s: float) -> float:
     ''' This function ensures that smooth transitions between gestures start and finish 
         gently, with zero slope at both ends.
+
+        It ensures a slower start and finish than using a simple linear interpolation. 
     '''
     s = max(0.0, min(1.0, s))
     return s * s * (3 - 2 * s)
@@ -83,7 +85,6 @@ def idle_pose(t: float) -> list[float]:
 def nearest_idle_time(pose: list[float], step_s: float = 0.1) -> float:
     ''' This function finds the time along the idle trajectory that is closest to the 
         arm's current pose, so the transition back to idle is smooth and doesn't jerk the arm around. 
-        It finds the closest point along the idle trajectory cycle to the arm's current pose. 
 
         The weights ensure that the base is prioritized over the other joints, so the arm 
         doesn't swing around to match the idle pose's base angle since the base accounts for the largest motion.
@@ -113,7 +114,14 @@ def wave_pose(t: float, base: float) -> list[float]:
 
 
 def beckon_pose(t: float, base: float) -> list[float]:
-    ''' The hand reaches out and curls back in a loop, beckoning the person to come closer. '''
+    ''' The hand reaches out and curls back in a loop, beckoning the person 
+        to come closer. 
+        
+        The elbow and wrist pitch move a quarter cycle apart, so the hand 
+        traces a loop; the wrist curls from +10 deg (pointing down) to -60 deg 
+        (pulled back up)
+    
+    '''
     _, shoulder, elbow, wrist, roll = REACH
     return [
         base,
