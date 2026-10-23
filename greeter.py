@@ -41,6 +41,7 @@ WAVE_OFFSET = [want - base for want, base in
 MOTION_BY_ARM = {"arm-SO101-real": "streamed"}                  # the real arm requires different motion commands than the simulated arm to avoid jerky behavior
 MOTION = MOTION_BY_ARM.get(ARM_NAME, "steps")                    # any other arm (e.g. the simulated arm) uses steps
 
+# All times below are plain float seconds (what time.monotonic() and asyncio.sleep() use).
 TICK_S = 0.1              # motion loop period (10 Hz): one move per tick on the simulated arm, one trajectory point per tick on the real arm
 STREAM_LEAD_S = 0.3       # each streamed point is timestamped this far ahead, so the real arm always has ~3 points queued
 TRANSITION_S  = 1.5       # trajectory smoothing time whenever the active gesture changes
@@ -51,6 +52,13 @@ WAVE_S   = WAVE_SMOOTH_S + 2 * gestures.WAVE_PERIOD_S     # total duration for t
 MIN_IDLE_S  = 2.0         # idle at least this long between greetings to avoid rapidly jumping from person to person
 LOST_S      = 2.0         # end a greeting early once the target is gone this long
 BASE_FOLLOW = 0.2         # per-tick smoothing of the base toward the person's bearing
+
+# Error handling (see recover() and run())
+ARM_CALL_TIMEOUT_S = 2.0  # give up on any single arm call after this long
+RETRY_DELAY_S      = 0.5  # pause before retrying a failed camera frame or start-pose read, so failures don't spin in a tight loop
+BACKOFF_STEP_S     = 0.25 # after a failed arm command, wait this long per failure in a row...
+BACKOFF_MAX_S      = 2.0  # ...but never longer than this
+START_POSE_ATTEMPTS = 5   # tries at reading the arm's starting pose before giving up
 
 
 class Phase(Enum):
@@ -88,7 +96,7 @@ class Greeter:
             except Exception as e:  # a dropped frame or RPC blip must not stop the robot
                 print(f"  detection failed: {type(e).__name__}: {e}")
                 people = []
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(RETRY_DELAY_S)
             self.tracker.update(people, time.monotonic())
 
     # --- behavior -----------------------------------------------------------
@@ -168,26 +176,27 @@ class Greeter:
             self.motion_clock += (tick - last) * SPEED
             last = tick
             pose = self.desired_pose(tick)
-            pose[4] += ROLL_OFFSET  # before smoothing: smooth_from is in the arm's own roll
+            pose[4] += ROLL_OFFSET  # wrist roll; before smoothing, because smooth_from is in the arm's own roll
             if self.smooth_from is not None:
                 pose = gestures.smooth_transition(self.smooth_from, pose,
                                                   (self.motion_clock - self.phase_start) / self.smooth_s)
             pose = gestures.clamp_pose(pose)
             try:
-                await self.arm.move_to_joint_positions(JointPositions(values=pose), timeout=2)
+                await self.arm.move_to_joint_positions(JointPositions(values=pose), timeout=ARM_CALL_TIMEOUT_S)
                 self.last_cmd = pose
                 failures = 0
             except Exception as e:  # report, back off, and keep going
                 failures += 1
                 print(f"  move failed ({failures} in a row): {type(e).__name__}: {e}")
                 await self.recover(failures)
+            # sleep for whatever is left of this tick, so ticks stay TICK_S apart even though each command takes time
             await asyncio.sleep(max(0.0, TICK_S - (time.monotonic() - tick)))
 
     def next_pose(self, tick: float, dt: float) -> list[float]:
         ''' Advance the motion clock by dt and return the clamped pose to command. '''
         self.motion_clock += dt * SPEED
         pose = self.desired_pose(tick)
-        pose[4] += ROLL_OFFSET  # before smoothing: smooth_from is in the arm's own roll
+        pose[4] += ROLL_OFFSET  # wrist roll; before smoothing, because smooth_from is in the arm's own roll
         if self.smooth_from is not None:
             pose = gestures.smooth_transition(self.smooth_from, pose,
                                               (self.motion_clock - self.phase_start) / self.smooth_s)
@@ -210,7 +219,7 @@ class Greeter:
                 nonlocal last
                 yield [Arm.TrajectoryPoint(time=timedelta(seconds=0.0), positions=origin)]
                 while True:
-                    await asyncio.sleep(max(0.0, TICK_S - (time.monotonic() - last)))
+                    await asyncio.sleep(max(0.0, TICK_S - (time.monotonic() - last)))   # wait out the rest of this tick
                     tick = time.monotonic()
                     pose = self.next_pose(tick, tick - last)
                     last = tick
@@ -232,28 +241,29 @@ class Greeter:
 
             On real hardware the recovery calls can fail too (e.g. a servo bus
             timeout), so each step is guarded; the loop just tries again next tick.
-            Repeated failures back off, up to 2 s, to give the bus time to clear.
+            Repeated failures back off (BACKOFF_STEP_S per failure in a row, up to
+            BACKOFF_MAX_S) to give the bus time to clear.
         '''
         try:
-            await self.arm.stop(timeout=2)
+            await self.arm.stop(timeout=ARM_CALL_TIMEOUT_S)
         except Exception as e:
             print(f"    stop failed too: {type(e).__name__}")
         try:  # smooth on from where the arm really is; keep the old pose if unreadable
-            self.last_cmd = list((await self.arm.get_joint_positions(timeout=2)).values)
+            self.last_cmd = list((await self.arm.get_joint_positions(timeout=ARM_CALL_TIMEOUT_S)).values)
         except Exception as e:
             print(f"    could not read joints: {type(e).__name__}")
-        await asyncio.sleep(min(2.0, 0.25 * failures))
+        await asyncio.sleep(min(BACKOFF_MAX_S, BACKOFF_STEP_S * failures))
 
     async def run(self):
-        for attempt in range(1, 6):  # the starting pose is needed to ease into idle
+        for attempt in range(1, START_POSE_ATTEMPTS + 1):  # the starting pose is needed to ease into idle
             try:
-                self.last_cmd = list((await self.arm.get_joint_positions(timeout=2)).values)
+                self.last_cmd = list((await self.arm.get_joint_positions(timeout=ARM_CALL_TIMEOUT_S)).values)
                 break
             except Exception as e:
-                print(f"  reading start pose failed (attempt {attempt}/5): {type(e).__name__}")
-                if attempt == 5:
+                print(f"  reading start pose failed (attempt {attempt}/{START_POSE_ATTEMPTS}): {type(e).__name__}")
+                if attempt == START_POSE_ATTEMPTS:
                     raise
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(RETRY_DELAY_S)
         print(f"Greeter running on '{ARM_NAME}' ({MOTION} motion) at {SPEED:g}x speed (Ctrl-C to stop)...")
         self.start_idle(time.monotonic())  # ease from wherever the arm starts into idle
         try:
@@ -262,7 +272,7 @@ class Greeter:
             await asyncio.gather(self.perceive(), move)
         finally:
             try:
-                await self.arm.stop(timeout=2)
+                await self.arm.stop(timeout=ARM_CALL_TIMEOUT_S)
             except Exception as e:
                 print(f"  final stop failed: {type(e).__name__}: {e}")
 
