@@ -270,6 +270,7 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 
 | Rule | Value | Purpose |
 |---|---|---|
+| Too far away | Box under 30% of the image height is ignored | Only greets people near the booth; background passersby are small and flicker in and out |
 | Confirm a new track | 3 frames (~0.5s) | Ignore one-frame false detections |
 | Eligible to greet | confirmed, not yet greeted, seen in the last 0.6s | Avoids turning toward someone who leaves the field of view |
 | Queue order | Closest first (largest box), re-checked every time | Prioritizes people near the booth |
@@ -349,7 +350,7 @@ Configure these in the Viam app (**CONFIGURE** tab). The code looks resources up
 | Setting | File | Default | Effect |
 |---|---|---|---|
 | `CAMERA_HFOV_DEG`, `MIRRORED` | `detect_person.py` | 70°, `False` | Camera model; set these when changing webcams |
-| `MIN_CONFIDENCE` | `detect_person.py` | 0.5 | Detection threshold |
+| `MIN_CONFIDENCE`, `MIN_SIZE` | `detect_person.py` | 0.5, 0.3 | Detection threshold; minimum box height (fraction of the image) for someone to count as near the booth |
 | `POINT_S`, `TRANSITION_S`, `WAVE_SMOOTH_S` | `greeter.py` | 2.5s, 1.5s, 1.2s | Greeting timing |
 | `MIN_IDLE_S`, `LOST_S`, `BASE_FOLLOW` | `greeter.py` | 2s, 2s, 0.2 | Pacing and how closely the base follows |
 | `ARM_CALL_TIMEOUT_S`, `RETRY_DELAY_S`, `BACKOFF_STEP_S`, `BACKOFF_MAX_S` | `greeter.py` | 2s, 0.5s, 0.25s, 2s | Error handling: timeouts, retries and back-off |
