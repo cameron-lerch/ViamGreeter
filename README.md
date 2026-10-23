@@ -3,10 +3,50 @@
 </p>
 
 <h1 align="center">ViamGreeter</h1>
+<p align="center"><em>by Cameron Lerch</em></p>
 
 Greeter is an autonomous booth greeter built on the [Viam](https://www.viam.com/) platform. Using a fixed webcam and a pre-trained model to detect and track people passing by a trade show booth, Greeter directs an SO-101 robotic arm to engage with each passerby. The arm turns toward them, points, beckons them over, and waves before moving on to the next person.
 
 It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be chosen via a setting in `.env`. The default is a simulated arm.
+
+---
+
+## Quick Start
+
+> [!NOTE]
+> You need a Viam machine with a webcam, the people detector and an arm configured (the simulated SO-101 works). See [Prerequisites](#81-prerequisites) and [Machine configuration](#82-machine-configuration) for the exact resources and names.
+
+**1. Install**
+
+```bash
+git clone git@github.com:cameron-lerch/ViamGreeter.git
+cd ViamGreeter
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Rename `.env_example` to `.env`, and replace the API key, API key ID and address using the information provided in the machine's **CONNECT** tab.
+
+`.env` is in `.gitignore`, so credentials never get committed.
+
+```bash
+VIAM_API_KEY=<api key>
+VIAM_API_KEY_ID=<api key id>
+VIAM_MACHINE_ADDRESS=<machine>.viam.cloud
+GREETER_ARM=arm-1            # or arm-SO101-real
+GREETER_SPEED=1.0            # optional: 0.5 = half-speed gestures (e.g. when running on a real arm)
+```
+
+**2. Run**
+
+```bash
+python3 connect.py          # 1. connection check: lists the machine's resources
+python3 detect_person.py    # 2. live detections: step to your right, and the bearing should go positive
+python3 greeter.py          # 3. the full Greeter (Ctrl-C stops the arm)
+```
+
+Watch the arm in the app's **3D SCENE** tab to see a live rendering of the motion. From the 3D Scene tab, select control widgets (top right of the scene) -> people_detector -> toggle the *overview* button to see a live stream of the camera feed with labels from the ML model. Run one script at a time as two scripts commanding the same arm cause interference.
 
 ---
 
@@ -271,6 +311,8 @@ ViamGreeter/
 
 ## 8. Setup and usage
 
+Install and run steps are in [Quick Start](#quick-start) at the top of this README. This section covers what the machine needs and what you can tune.
+
 ### 8.1 Prerequisites
 
 - Python 3.11+ (developed on 3.14)
@@ -290,39 +332,7 @@ Configure these in the Viam app (**CONFIGURE** tab). The code looks resources up
 | `arm-1` | Arm | Simulated SO-101 (from the `devrel/so101-arm` module) |
 | `arm-SO101-real` | Arm | *Optional.* Physical SO-101 (same module); see [§9.3](#93-real-arm-settings) |
 
-### 8.3 Install
-
-```bash
-git clone git@github.com:cameron-lerch/ViamGreeter.git
-cd ViamGreeter
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Rename `.env_example` to `.env`, and replace the API key, API key ID and address using the information provided in the machine's **CONNECT** tab.
-
-`.env` is in `.gitignore`, so credentials never get committed.
-
-```bash
-VIAM_API_KEY=<api key>
-VIAM_API_KEY_ID=<api key id>
-VIAM_MACHINE_ADDRESS=<machine>.viam.cloud
-GREETER_ARM=arm-1            # or arm-SO101-real
-GREETER_SPEED=1.0            # optional: 0.5 = half-speed gestures (e.g. when running on a real arm)
-```
-
-### 8.4 Run
-
-```bash
-python3 connect.py          # 1. connection check: lists the machine's resources
-python3 detect_person.py    # 2. live detections: step to your right, and the bearing should go positive
-python3 greeter.py          # 3. the full Greeter (Ctrl-C stops the arm)
-```
-
-Watch the arm in the app's **3D SCENE** tab to see a live rendering of the motion. From the 3D Scene tab, select control widgets (top right of the scene) -> people_detector -> toggle the *overview* button to see a live stream of the camera feed with labels from the ML model. Run one script at a time as two scripts commanding the same arm cause interference. 
-
-### 8.5 Tuning
+### 8.3 Tuning
 
 | Setting | File | Default | Effect |
 |---|---|---|---|
