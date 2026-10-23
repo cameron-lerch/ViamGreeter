@@ -31,6 +31,8 @@ CAMERA_NAME = "cam"
 CAMERA_HFOV_DEG = 70.0   # horizontal field of view of the camera (70 deg is good for most webcams)
 MIRRORED = False         # set True if the webcam feed is horizontally flipped
 MIN_CONFIDENCE = 0.5     # ignore detections the model is less than 50% sure of
+MIN_SIZE = 0.25          # ignore people whose box is under 25% of the image height: too far from the booth to greet
+
 PERSON_LABEL = "person"  # compared case-insensitively (EfficientDet-COCO reports "Person")
 
 
@@ -68,10 +70,11 @@ def pixel_to_direction(u: float, v: float, width: int, height: int,
 
 
 class PersonDetector:
-    def __init__(self, robot: RobotClient, min_confidence: float = MIN_CONFIDENCE):
+    def __init__(self, robot: RobotClient, min_confidence: float = MIN_CONFIDENCE, min_size: float = MIN_SIZE):
         self.vision = VisionClient.from_robot(robot, VISION_NAME)
         self.camera_name = CAMERA_NAME
         self.min_confidence = min_confidence
+        self.min_size = min_size
 
     async def detect(self) -> list[Person]:
         ''' One frame's people, largest (likely closest) first.
@@ -90,6 +93,8 @@ class PersonDetector:
         people = []
         for d in result.detections or []:
             if d.class_name.lower() != PERSON_LABEL or d.confidence < self.min_confidence:
+                continue
+            if (d.y_max - d.y_min) / height < self.min_size:   # filters out people who are in the background, so that only people within a certain (tunable) range are detected.
                 continue
             cx, cy = (d.x_min + d.x_max) / 2, (d.y_min + d.y_max) / 2
             bearing, elevation = pixel_to_direction(cx, cy, width, height)
