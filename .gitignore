@@ -3,3 +3,4 @@ __pycache__/
 .env
 INTERVIEW_NOTES.md
 tools/
+.pytest_cache/
