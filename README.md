@@ -12,9 +12,6 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be cho
 
 ## Quick Start
 
-> [!TIP]
-> Want to see Greeter in action first? Watch the [simulation demo](#simulated-so-101-viam-3d-scene) or the [real-arm demo](#real-so-101-arm).
-
 > [!NOTE]
 > You need a Viam machine with a webcam, the people detector and an arm configured (the simulated SO-101 works). See [Prerequisites](#81-prerequisites) and [Machine configuration](#82-machine-configuration) for the exact resources and names.
 
@@ -56,6 +53,9 @@ python3 greeter.py          # the full Greeter (Ctrl-C stops the arm)
 ```
 
 Watch the arm in the app's **3D SCENE** tab to see a live rendering of the motion. From the 3D Scene tab, select control widgets (top right of the scene) -> people_detector -> toggle the *overview* button to see a live stream of the camera feed with labels from the ML model. Run one script at a time as two scripts commanding the same arm cause interference.
+
+> [!NOTE]
+> Click here to check out the [simulation demo](#simulated-so-101-viam-3d-scene) or the [real-arm demo](#real-so-101-arm).
 
 ---
 
