@@ -54,8 +54,8 @@ python3 greeter.py          # the full Greeter (Ctrl-C stops the arm)
 
 Watch the arm in the app's **3D SCENE** tab to see a live rendering of the motion. From the 3D Scene tab, select control widgets (top right of the scene) -> people_detector -> toggle the *overview* button to see a live stream of the camera feed with labels from the ML model. Run one script at a time as two scripts commanding the same arm cause interference.
 
-> [!NOTE]
-> Click here to check out the [simulation demo](#simulated-so-101-viam-3d-scene) or the [real-arm demo](#real-so-101-arm).
+> [!TIP]
+> Check out the [simulation demo](#simulated-so-101-viam-3d-scene) or the [real-arm demo](#real-so-101-arm) to see Greeter in action!
 
 ---
 
@@ -143,14 +143,14 @@ I broke Greeter down into four stages, each tested before moving on to the next:
 
 The video opens on the *idle* behavior: a slow, gentle scanning sway while the camera watches for people to pass by. When a person is detected (in the video at ~15 sec), Greeter:
 
-1. **Points** at them with an outstretched arm for 2.5 seconds, so it's obvious who is being greeted.
+1. **Points** at them with an outstretched arm for a couple of seconds, so it's obvious who is being greeted.
 2. **Beckons** them over twice: the hand reaches low toward them and curls up and back.
 3. **Waves** at them with a raised hand.
 4. **Transitions smoothly back** into the gentle idle sway, picking up the arm's current pose.
 
 Throughout the greeting, the base joint rotates to track the person as they move and all gestures remain centered on the person.
 
-*Not pictured:* Greeter keeps a **queue** of everyone in the scene and greets them one at a time, closest first. It never greets the same person twice, unless they leave the scene for more than 3 seconds and come back, in which case they're treated as a new visitor. If a person leaves the scene during a greeting sequence for more than 2 seconds, then the greeting stops and the idle sequence begins again, or it moves on to the next person.
+*Not pictured:* Greeter keeps a **queue** of everyone in the scene and greets them one at a time, closest first. It never greets the same person twice, unless they leave the scene for more than a few seconds and come back, in which case they're treated as a new visitor. If a person stays out of view for a couple of seconds during their greeting, the greeting stops and Greeter returns to idle, or moves on to the next person. (Exact timings are in [§5.4](#54-tracking-and-greeting-queue).)
 
 ### Real SO-101 Arm
 
@@ -188,10 +188,10 @@ Two loops run asynchronously:
 
 | State | What the arm does |
 |---|---|
-| **Idle** | Slow scanning sweep: the joints gently oscillate through sine functions with varying periods, the base moves ±30° while the shoulder, elbow, and wrist bob on different rhythms. It repeats only every 126 s. |
+| **Idle** | Slow scanning sweep: each joint follows a sine wave with a different period, so the base sweeps side to side while the shoulder, elbow, and wrist bob on different rhythms. |
 | **Point** | Arm stretched out level toward the person, so it's obvious who is being greeted. |
 | **Beckon** | Hand low and forward before curling back to suggest "come over here" to the person being greeted. |
-| **Wave** | Hand raised as the base sways ±10° and the wrist rocks resulting in a wave. |
+| **Wave** | Hand raised as the base sways side to side and the wrist rocks, resulting in a wave. |
 
 During every gesture, the base joint tracks the person as they walk. 
 
@@ -229,7 +229,7 @@ f = \frac{W/2}{\tan\left(\dfrac{\mathrm{HFOV}}{2}\right)}
 |---|---|---|
 | $f$ | Focal length of the camera, in pixels | px |
 | $W$ | Image width | px |
-| $\mathrm{HFOV}$ | Camera's horizontal field of view (70° for the C920) | degrees |
+| $\mathrm{HFOV}$ | Camera's horizontal field of view (`CAMERA_HFOV_DEG`) | degrees |
 | $u$ | Horizontal pixel position of the bounding-box center | px |
 | $W/2$ | Horizontal center of the image | px |
 | $u - W/2$ | How far the person is from the image center (positive = right side of the image) | px |
@@ -255,13 +255,13 @@ Elevation is computed in the same way using `v`, but is not yet used for aiming.
 
 ### 5.3 Gestures as Functions of Time
 
-*Idle*, *point*, *beckon* and *wave* are each a function of time, `pose = f(t)` in `gestures.py`. Ten times a second, the controller asks the active motion where the arm should be in that instant. This gives:
+*Idle*, *point*, *beckon* and *wave* are each a function of time, `pose = f(t)` in `gestures.py`. On every tick of the motion loop ([§4.1](#41-block-diagram)), the controller asks the active motion where the arm should be in that instant. This gives:
 
 - **Instant interruption.** *idle* is only sampled, never left running, so it can stop the moment someone appears.
 - **Smooth trajectories between gestures.** Every change in gesture (*idle*, *point*, *beckon*, or *wave*) uses trajectory smoothing from the arm's actual pose, following a smoothstep curve that ties the motion together smoothly. Returning to idle resumes at the point on the idle path nearest the arm's current pose, so the arm never swings across to a distant point.
 - **Continuous tracking.** The person's bearing feeds into every gesture.
 - **Safety via joint limits.** Every pose passes through `clamp_pose()`: joint limits from the arm's kinematics, minus a 5° margin, with the shoulder further capped so the arm never reaches down into the table. 
-- **Speeds checked offline.** Each gesture's own motion is designed to stay under the simulated arm's ~60°/s limit; the fastest transition (beckon → wave) briefly reaches about 91°/s.
+- **Speeds checked offline.** Each gesture's own motion is designed to stay within the arm's speed limit (measured peaks are in [§9.3](#93-real-arm-settings)).
 
 ### 5.4 Tracking and Greeting Queue
 
@@ -284,10 +284,10 @@ The detector only reports "a person at this bearing" each frame; it doesn't know
 | Requirement | Implementation | Where |
 |---|---|---|
 | **1** Look for people and orient toward them | Uses the `people_detector` vision service. Each bounding box becomes a bearing that is smoothly followed | `detect_person.py`, `greeter.py` (`desired_pose`) |
-| **2** Hold on a person so they feel acknowledged | Point for 2.5s, then two beckons and a wave, while all motions are oriented towards them | `greeter.py`, `gestures.py` |
+| **2** Hold on a person so they feel acknowledged | Points at the person, then beckons twice and waves, with every motion oriented toward them | `greeter.py`, `gestures.py` |
 | **3** Behave sensibly when nobody is there | Implemented a gentle idle sequence when no people are detected. | `gestures.idle_pose`, `Greeter.start_idle` |
-| **3** Robust to dropouts and flicker | 3-frame confirmation for each target, 3s buffer before Greeter stops tracking them, and 2s tolerance if someone leaves mid-greeting. Detection errors are logged and the loop continues. | `tracking.py`, `Greeter.perceive` |
-| **4** Don't get stuck or crash on unreachable poses | Joint-space commands only, clamped to the arm's kinematic limits with a 5° margin (plus extra room for the table), so every command is reachable | `gestures.clamp_pose` |
+| **3** Robust to dropouts and flicker | A new person must be seen in several consecutive frames, short dropouts are tolerated before a track is dropped, and a greeting only ends if the person stays out of view (values in [§5.4](#54-tracking-and-greeting-queue)). Detection errors are logged and the loop continues. | `tracking.py`, `Greeter.perceive` |
+| **4** Don't get stuck or crash on unreachable poses | Joint-space commands only, clamped to the arm's kinematic limits with a safety margin (plus extra room for the table), so every command is reachable | `gestures.clamp_pose` |
 
 ---
 
@@ -310,7 +310,7 @@ ViamGreeter/
 
 | File | Summary |
 |---|---|
-| **`greeter.py`** | Main file. The `Greeter` class runs two concurrent loops: **perception** (detector → tracker) and **motion** (state machine → arm). The state machine manages the active gesture (*idle*, *point*, *beckon* or *wave*) and when to switch to a new one, based on camera feedback and timing. It also handles the motion clock, trajectory smoothing between gestures, and settings for each arm. It sends motion either as single joint commands at 10 Hz for a simulated arm or as streamed joint commands for a real arm, and recovers from arm errors without crashing. |
+| **`greeter.py`** | Main file. The `Greeter` class runs two concurrent loops: **perception** (detector → tracker) and **motion** (state machine → arm). The state machine manages the active gesture (*idle*, *point*, *beckon* or *wave*) and when to switch to a new one, based on camera feedback and timing. It also handles the motion clock, trajectory smoothing between gestures, and settings for each arm. It sends motion either as single joint commands for a simulated arm or as streamed joint commands for a real arm, and recovers from arm errors without crashing. |
 | **`gestures.py`** | Pure functions with no SDK dependency. They return 5 joint angles `[base, shoulder, elbow, wrist pitch, wrist roll]` for a given time: `idle_pose`, `point_pose`, `beckon_pose`, `wave_pose`. Also holds the joint limits and `clamp_pose`, the `smoothstep` function for trajectory smoothing, and `nearest_idle_time` for resuming idle smoothly. |
 | **`tracking.py`** | `PeopleTracker` matches each frame's detections to `Track`s by bearing, confirms new tracks, forgets stale ones, keeps the `greeted` flag, and returns `next_target()`, the closest eligible person. |
 | **`detect_person.py`** | `PersonDetector.detect()` gets one image and its detections from the vision service in a single call, keeps confident `person` detections, and converts each to bearing and elevation with `pixel_to_direction()`. Can be run directly to print live detections and per-frame latency. |
@@ -362,7 +362,7 @@ I initially expected the move from simulation to a real arm to need **some tunin
 
 | Symptom on the real arm | Root cause | Fix |
 |---|---|---|
-| **Very jerky motion**: the servos started and stopped several times a second, joints sometimes moved one at a time, and gestures ran slowly | The motion loop sent a new target 10 times a second using `move_to_joint_positions`. The simulated arm accepts each one instantly, but on the real arm each call is a complete move that starts and ends at rest. | Switched the real arm to `move_through_joint_positions_streamed`: one continuous, timestamped trajectory. See [§9.2](#92-joint-position-motion-commands-simulation-vs-real). |
+| **Very jerky motion**: the servos started and stopped several times a second, joints sometimes moved one at a time, and gestures ran slowly | The motion loop sent a new target on every tick using `move_to_joint_positions`. The simulated arm accepts each one instantly, but on the real arm each call is a complete move that starts and ends at rest. | Switched the real arm to `move_through_joint_positions_streamed`: one continuous, timestamped trajectory. See [§9.2](#92-joint-position-motion-commands-simulation-vs-real). |
 | The arm module kept dropping bytes from the servos (`communication error during sync_read: read 40 of 48 expected bytes`), and joint reads and moves failed | USB contention. The webcam was plugged into the same USB dongle as the arm's serial adapter. The 1080p video stream filled the shared USB link, so replies from the servo bus arrived incomplete and the module timed out. | Moved the webcam to its own USB port. |
 | Shaking at the top of the wave | The play between the gears, the hobby-grade servos, and the plastic links of the real SO-101 led to shaking when the arm was fully extended | Reduced the *wave* gesture's extension on the real arm |
 | Hand oriented in the wrong direction | Wrist joint differs between the simulated and real arm | Adjusted the wrist joint to be 90° in simulation and 0° on the real arm |
@@ -375,20 +375,20 @@ The gestures, state machine, tracking and pose calculation are all identical for
 
 | | Simulated arm (`steps` mode) | Real SO-101 (`streamed` mode) |
 |---|---|---|
-| **SDK call** | `arm.move_to_joint_positions(...)`, called again every 0.1 s | `arm.move_through_joint_positions_streamed(...)`, one call kept open for the whole run |
+| **SDK call** | `arm.move_to_joint_positions(...)`, called again on every motion-loop tick | `arm.move_through_joint_positions_streamed(...)`, one call kept open for the whole run |
 | **What each pose becomes** | A separate "go to these joint angles" command | An `Arm.TrajectoryPoint` with a timestamp 0.3 s ahead (`STREAM_LEAD_S`) |
 | **Code** | `Greeter.move()` | `Greeter.move_streamed()` |
 | **Selected by** | Default for any arm | `MOTION_BY_ARM = {"arm-SO101-real": "streamed"}` |
 
 **Why the simulated arm uses `move_to_joint_positions`:** it's the simplest way to command an arm: send a set of joint angles, and the arm moves to them. The simulated arm carries out each command instantly, so sending ten small moves per second produces motion that looks perfectly smooth in the 3D scene.
 
-**Why that failed on the real arm:** on the physical SO-101, every `move_to_joint_positions` is a complete move. The servos accelerate, slow down, stop, and then report that they've reached their goal. Sending one every 0.1s made the servos start and stop several times a second, which produced very jerky motion.
+**Why that failed on the real arm:** on the physical SO-101, every `move_to_joint_positions` is a complete move. The servos accelerate, slow down, stop, and then report that they've reached their goal. Sending one on every tick made the servos start and stop several times a second, which produced very jerky motion.
 
 **The three options I compared on the real arm:**
 
 | Option | Result |
 |---|---|
-| `move_to_joint_positions`, 10 times a second | Jerky stop-start motion and slow gestures (see [§9.1 Troubleshooting a real arm](#91-troubleshooting-a-real-arm)) |
+| `move_to_joint_positions`, once per tick | Jerky stop-start motion and slow gestures (see [§9.1 Troubleshooting a real arm](#91-troubleshooting-a-real-arm)) |
 | `move_through_joint_positions`, the whole wave as one waypoint list | Much smoother than `move_to_joint_positions` because the module doesn't stop at each waypoint. But a plain waypoint list has no timing, so the arm ran a 4 s wave in 2.6 s at its own speed (the speed could be capped or stretched to roughly match the timing, but there is no inherent timing command). The list is also fixed before it starts, so the base can't keep tracking a moving person. |
 | `move_through_joint_positions_streamed`, timestamped points generated live | This option resulted in the smoothest motion. The servos never stop between points and it keeps the gesture's timing, because each point has a timestamp. The base joint continues to track the person through gestures because the stream of points is computed from the latest detections as the stream runs. |
 
