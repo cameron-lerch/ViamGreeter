@@ -12,6 +12,9 @@ It runs on Viam's simulated SO-101 arm and on a real SO-101 arm which can be cho
 
 ## Quick Start
 
+> [!TIP]
+> Want to see Greeter in action first? Watch the [simulation demo](#simulated-so-101-viam-3d-scene) or the [real-arm demo](#real-so-101-arm).
+
 > [!NOTE]
 > You need a Viam machine with a webcam, the people detector and an arm configured (the simulated SO-101 works). See [Prerequisites](#81-prerequisites) and [Machine configuration](#82-machine-configuration) for the exact resources and names.
 
