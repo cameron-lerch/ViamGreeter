@@ -2,8 +2,7 @@
   <img src="media/images/arm-SO101.png" alt="SO-101 robotic arm" width="260">
 </p>
 
-<h1 align="center">ViamGreeter</h1>
-<p align="center"><em>by Cameron Lerch</em></p>
+<h1 align="center">ViamGreeter by Cameron Lerch</h1>
 
 Greeter is an autonomous booth greeter built on the [Viam](https://www.viam.com/) platform. Using a fixed webcam and a pre-trained model to detect and track people passing by a trade show booth, Greeter directs an SO-101 robotic arm to engage with each passerby. The arm turns toward them, points, beckons them over, and waves before moving on to the next person.
 
@@ -38,12 +37,19 @@ GREETER_ARM=arm-1            # or arm-SO101-real
 GREETER_SPEED=1.0            # optional: 0.5 = half-speed gestures (e.g. when running on a real arm)
 ```
 
-**2. Run**
+**2. Check the setup (optional)**
+
+Two quick checks before running Greeter. Neither moves the arm.
 
 ```bash
-python3 connect.py          # 1. connection check: lists the machine's resources
-python3 detect_person.py    # 2. live detections: step to your right, and the bearing should go positive
-python3 greeter.py          # 3. the full Greeter (Ctrl-C stops the arm)
+python3 connect.py          # lists the machine's resources: confirms the connection and resource names
+python3 detect_person.py    # prints live detections: step to your right and the bearing should go positive
+```
+
+**3. Run Greeter**
+
+```bash
+python3 greeter.py          # the full Greeter (Ctrl-C stops the arm)
 ```
 
 Watch the arm in the app's **3D SCENE** tab to see a live rendering of the motion. From the 3D Scene tab, select control widgets (top right of the scene) -> people_detector -> toggle the *overview* button to see a live stream of the camera feed with labels from the ML model. Run one script at a time as two scripts commanding the same arm cause interference.
@@ -101,27 +107,27 @@ The README must also state:
   <em>From my notebook: the problem statement, goals, required deliverables, and a sketch of the arm at a trade show.</em>
 </p>
 
-My approach to problem-solving is to break a problem down into its simplest components and build up from there. I start by defining the problem statement and identifying the required deliverables, such as this README and a justification for the camera placement. I then identify smaller, manageable tasks and sketch out the system, whether through a block diagram of the control scheme or a drawing of the physical setup.
+My approach to problem-solving is to break a problem down into its simplest components and build up from there. I start by defining the problem statement and identifying the [required deliverables](#1-problem-statement-and-goals), such as this README and a [justification for the camera placement](#51-camera-placement). I then identify smaller, manageable tasks and sketch out the system, whether through a [block diagram of the control scheme](#41-block-diagram) or a drawing of the physical setup (like the notebook sketch above).
 
 With a clearer understanding of the problem and its components, I brainstorm potential solutions for each task, identifying areas where I have creative freedom. There was plenty of room for creative freedom with Greeter:
 
-- how to greet people
-- where to place the camera
-- how the robot behaves when nobody is around
-- which ML model to use for detecting people
-- how to handle several people in view at once
-- how to compute trajectories and command the arm to follow them
+- how to greet people: [§4.2 Behavior State Machine](#42-behavior-state-machine), [`gestures.py`](gestures.py)
+- where to place the camera: [§5.1 Camera Placement](#51-camera-placement)
+- how the robot behaves when nobody is around: the *idle* gesture, `idle_pose` in [`gestures.py`](gestures.py)
+- which ML model to use for detecting people: [§8.2 Machine configuration](#82-machine-configuration), [`detect_person.py`](detect_person.py)
+- how to handle several people in view at once: [§5.4 Tracking and Greeting Queue](#54-tracking-and-greeting-queue), [`tracking.py`](tracking.py)
+- how to compute trajectories and command the arm to follow them: [§5.3 Gestures as Functions of Time](#53-gestures-as-functions-of-time), [§9.2](#92-joint-position-motion-commands-simulation-vs-real), [`greeter.py`](greeter.py)
 
-I research existing approaches and evaluate the resources available to me. For this project, I assessed the available hardware and explored the software tools and built-in packages provided by the Viam SDK to determine how to implement the system.
+I research existing approaches and evaluate the resources available to me. For this project, I assessed the available hardware and explored the software tools and built-in packages provided by the [Viam Python SDK](https://python.viam.dev/) to determine how to implement the system.
 
 As I experiment with different approaches, I keep a notebook nearby to document my thought process, record assumptions, and track unresolved questions and challenges. This helps me evaluate my decisions, identify shortcomings in my approach, and keep track of questions to revisit as I learn more about the system.
 
 I broke Greeter down into four stages, each tested before moving on to the next:
 
-1. **Perception:** Decide where to place the webcam. Configure the webcam and the ML model for the people detector, and transform bounding boxes from the images into bearings in the robot's frame (`detect_person.py`).
-2. **Tracking:** Track a person as they move through the camera frame, turning the base joint to follow them, and deal with flickering (`tracking.py`).
-3. **Gestures and Queue:** Design the gestures (*idle*, *point*, *beckon*, and *wave*), add a state machine, implement a queue system so each person is only greeted once, and refine the gestures in the 3D scene (`greeter.py`, `gestures.py`).
-4. **Real hardware:** Port to a physical SO-101 and investigate the *sim-to-real* gap (see [§9.1 Troubleshooting a real arm](#91-troubleshooting-a-real-arm)).
+1. **Perception:** Decide where to place the webcam. Configure the webcam and the ML model for the people detector, and transform bounding boxes from the images into bearings in the robot's frame ([`detect_person.py`](detect_person.py); see [§5.2](#52-mapping-a-detection-to-an-arm-command)).
+2. **Tracking:** Track a person as they move through the camera frame, turning the base joint to follow them, and deal with flickering ([`tracking.py`](tracking.py); see [§5.4](#54-tracking-and-greeting-queue)).
+3. **Gestures and Queue:** Design the gestures (*idle*, *point*, *beckon*, and *wave*), add a state machine, implement a queue system so each person is only greeted once, and refine the gestures in the 3D scene ([`greeter.py`](greeter.py), [`gestures.py`](gestures.py); see [§4.2](#42-behavior-state-machine) and [§5.3](#53-gestures-as-functions-of-time)).
+4. **Real hardware:** Port to a physical SO-101 and investigate the *sim-to-real* gap (see [§9.1 Troubleshooting a real arm](#91-troubleshooting-a-real-arm) and [§9.2](#92-joint-position-motion-commands-simulation-vs-real)).
 
 ---
 
