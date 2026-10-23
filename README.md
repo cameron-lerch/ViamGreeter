@@ -142,7 +142,7 @@ I broke Greeter down into four stages, each tested before moving on to the next:
 
 **[Simulation Demo Video](media/videos/greeter_sim.mp4)** (`media/videos/greeter_sim.mp4`)
 
-The video opens on the *idle* behavior: a slow, gentle scanning sway while the camera watches for people to pass by. When a person is detected (in the video at ~15 sec), Greeter:
+The video opens on the *idle* behavior: a slow, gentle scanning sway while the camera watches for people to pass by. When a person is detected (in the video at ~15s), Greeter:
 
 1. **Points** at them with an outstretched arm for a couple of seconds, so it's obvious who is being greeted.
 2. **Beckons** them over twice: the hand reaches low toward them and curls up and back.
@@ -194,7 +194,7 @@ Two loops run asynchronously:
 | **Beckon** | Hand low and forward before curling back to suggest "come over here" to the person being greeted. |
 | **Wave** | Hand raised as the base sways side to side and the wrist rocks, resulting in a wave. |
 
-During every greeting gesture, the base joint tracks the person as they walk. 
+During every greeting gesture, the base joint tracks the person as they walk.
 
 ---
 
@@ -208,7 +208,7 @@ Why a fixed camera instead of one on the wrist:
 
 - **Enables Greeter to greet and look for new people.** Greeter can greet the current person (*point*->*beckon*->*wave*) and simultaneously scan the scene for new people to greet and add them to the queue.
 - **Simplifies the mapping.** With a fixed image along the x-axis, it simplifies the problem so I don't have to map the camera image to the world-frame with every movement of the arm. A wrist-mounted camera would see the whole scene shift every time the arm moved, and every detection would need correcting.
-- **Simplifies tracking and enables fancier movements.** A fixed camera also loosens constraints on the motion so that Greeter can move freely without needing to keep the person being greeted in the camera's field of view the entire time. Similarly, it also makes managing the queue of people to greet simpler. 
+- **Simplifies tracking and enables fancier movements.** A fixed camera also loosens constraints on the motion so that Greeter can move freely without needing to keep the person being greeted in the camera's field of view the entire time. Similarly, it also makes managing the queue of people to greet simpler.
 
 ### 5.2 Mapping a Detection to an Arm Command
 
@@ -244,9 +244,9 @@ Angles are in degrees. The code converts $\mathrm{HFOV}$ to radians for $\tan$, 
 - **Focal length:** the [angle of view](https://en.wikipedia.org/wiki/Angle_of_view) formula $\alpha = 2\arctan\left(\frac{d}{2f}\right)$, solved for $f$, with the sensor width $d$ measured in pixels ($W$) and $\alpha = \mathrm{HFOV}$.
 - **Minus sign:** Adjustment for the camera's +X points right, but the world frame's +y points left and bearings are positive counter-clockwise.
 
-These equations assume: square pixels, the *principal point* is at the image center, and no lens distortion. For more accuracy, a camera calibration could measure $f$, $c_x$ and the distortion directly, but these assumptions were accurate enough for tracking people with a webcam. 
+These equations assume: square pixels, the *principal point* is at the image center, and no lens distortion. For more accuracy, a camera calibration could measure $f$, $c_x$ and the distortion directly, but these assumptions were accurate enough for tracking people with a webcam.
 
-Elevation is computed in the same way using `v`, but is not yet used for aiming. 
+Elevation is computed in the same way using `v`, but is not yet used for aiming.
 
 **Why this mapping:**
 
@@ -261,7 +261,7 @@ Elevation is computed in the same way using `v`, but is not yet used for aiming.
 - **Instant interruption.** *idle* is only sampled, never left running, so it can stop the moment someone appears.
 - **Smooth trajectories between gestures.** Every change in gesture (*idle*, *point*, *beckon*, or *wave*) uses trajectory smoothing from the arm's actual pose, following a smoothstep curve that ties the motion together smoothly. Returning to idle resumes at the point on the idle path nearest the arm's current pose, so the arm never swings across to a distant point.
 - **Continuous tracking.** The person's bearing feeds into every gesture.
-- **Safety via joint limits.** Every pose passes through `clamp_pose()`: joint limits from the arm's kinematics, minus a 5° margin, with the shoulder further capped so the arm never reaches down into the table. 
+- **Safety via joint limits.** Every pose passes through `clamp_pose()`: joint limits from the arm's kinematics, minus a 5° margin, with the shoulder further capped so the arm never reaches down into the table.
 - **Speeds checked offline.** Each gesture's own motion is designed to stay within the arm's speed limit (measured peaks are in [§9.3](#93-real-arm-settings)).
 
 ### 5.4 Tracking and Greeting Queue
@@ -352,14 +352,15 @@ Configure these in the Viam app (**CONFIGURE** tab). The code looks resources up
 | `MIN_CONFIDENCE` | `detect_person.py` | 0.5 | Detection threshold |
 | `POINT_S`, `TRANSITION_S`, `WAVE_SMOOTH_S` | `greeter.py` | 2.5s, 1.5s, 1.2s | Greeting timing |
 | `MIN_IDLE_S`, `LOST_S`, `BASE_FOLLOW` | `greeter.py` | 2s, 2s, 0.2 | Pacing and how closely the base follows |
+| `ARM_CALL_TIMEOUT_S`, `RETRY_DELAY_S`, `BACKOFF_STEP_S`, `BACKOFF_MAX_S` | `greeter.py` | 2s, 0.5s, 0.25s, 2s | Error handling: timeouts, retries and back-off |
 | `MATCH_GATE_DEG`, `CONFIRM_HITS`, `FORGET_S` | `tracking.py` | 12°, 3, 3s | Tracking and flicker tolerance |
-| Poses and periods (`POINT`, `RAISED`, `REACH`, `IDLE_CENTER`, ...) | `gestures.py` | | Gesture shape (amplitudes and periods) |
+| Poses (`POINT`, `RAISED`, `REACH`, `IDLE_CENTER`), sways and periods (`IDLE_SWAY_DEG`, `IDLE_PERIOD_S`, `WAVE_SWAY_DEG`, `WAVE_PERIOD_S`, `BECKON_CURL_DEG`, ...) | `gestures.py` | | Gesture shape and speed |
 
 ---
 
 ## 9. Working with a Real Arm
 
-I initially expected the move from simulation to a real arm to need **some tuning**: speeds, timings, maybe a few poses. What I didn't expect was a **structural change in how the code sends motion to the arm**. The real arm needed continuous streams of joint positions instead of one joint position at a time in order to achieve smooth motion. [§9.1](#91-troubleshooting-a-real-arm) walks through each problem I troubleshot on the real arm, its root cause and the fix. 
+I initially expected the move from simulation to a real arm to need **some tuning**: speeds, timings, maybe a few poses. What I didn't expect was a **structural change in how the code sends motion to the arm**. The real arm needed continuous streams of joint positions instead of one joint position at a time in order to achieve smooth motion. [§9.1](#91-troubleshooting-a-real-arm) walks through each problem I troubleshot on the real arm, its root cause and the fix.
 
 ### 9.1 Troubleshooting a Real Arm
 
@@ -409,7 +410,7 @@ SO-101 arm module attributes (set in the Viam app, not in code) that gave the be
 ```
 
 - **`speed_degs_per_sec`: raised from the default 50 to 120.** At 50°/s the servos couldn't reach the joint positions Greeter was commanding in time: the beckon peaks at about 59°/s and the rise into the wave at about 91°/s, so the arm fell behind the gestures.
-- **`waypoint_lookahead_deg`: 20.** How far ahead of the arm the module writes the next servo goal during a stream. A larger value means the servos never slow down to wait for the next point. This setting had the largest impact when smoothing out the arm motion. 
+- **`waypoint_lookahead_deg`: 20.** How far ahead of the arm the module writes the next servo goal during a stream. A larger value means the servos never slow down to wait for the next point. This setting had the largest impact when smoothing out the arm motion.
 - **`acceleration_degs_per_sec_per_sec`: 500,** the maximum the servos support.
 - **`port`** varies by machine.
 

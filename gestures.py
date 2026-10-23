@@ -30,17 +30,28 @@ JOINT_LIMITS = [
 HAND_ROLL = 90.0  # wrist roll that turns the gripper so it reads as a flat hand
 
 IDLE_CENTER = [0.0, -10.0, 5.0, 10.0, HAND_ROLL]   # out in front, hand tipped slightly down
-POINT = [0.0, -15.0, 10.0, 5.0, HAND_ROLL]         # arm outstretched, hand level: pointing at the person
+POINT  = [0.0, -15.0, 10.0, 5.0, HAND_ROLL]        # arm outstretched, hand level: pointing at the person
 RAISED = [0.0, -25.0, -55.0, -10.0, HAND_ROLL]     # forearm and hand pointing up, like a raised hand
-REACH = [0.0, 5.0, 20.0, 10.0, HAND_ROLL]          # hand low and out toward the person
+REACH  = [0.0, 5.0, 20.0, 10.0, HAND_ROLL]         # hand low and out toward the person
 
-WAVE_PERIOD_S = 2.0
+# Idle: each joint sways either side of IDLE_CENTER on its own period.
+IDLE_SWAY_DEG = (30.0, 10.0, 12.0, 25.0)   # base, shoulder, elbow, wrist pitch: how far each sways either way
+IDLE_PERIOD_S = (14, 9, 9, 7)              # seconds per sway, same joint order; uneven periods so the path drifts
+IDLE_CYCLE_S  = float(math.lcm(*IDLE_PERIOD_S))   # 126s: when all the periods line up and the idle path repeats
+
+# Wave: the base sways side to side while the wrist rolls back and forth.
+WAVE_PERIOD_S = 2.0      # one side-to-side sway
+WAVE_SWAY_DEG = 10.0     # base swing either side of the person
+WAVE_ROCK_DEG = 15.0     # wrist roll either side of HAND_ROLL
+
+# Beckon: the hand reaches out low, then curls up and back toward the arm.
 BECKON_PERIOD_S = 3.7    # the 70 deg wrist curl needs this long to stay under the ~60 deg/s speed cap
 BECKON_CURL_DEG = 70.0   # wrist pitch travel: from +10 (pointing down) to -60 (pulled back up)
-IDLE_CYCLE_S = 126.0     # idle periods 14, 9 and 7 s line up every 126 s
+BECKON_ELBOW_DEG = 10.0  # elbow swing either side of REACH, a quarter cycle off the wrist curl
 
 
 def _sin(t: float, period: float, phase: float = 0.0) -> float:
+    ''' A sine wave with the given period in seconds (and optional phase offset in radians). '''
     return math.sin(2 * math.pi * t / period + phase)
 
 def clamp_pose(pose: list[float]) -> list[float]:
@@ -50,19 +61,28 @@ def clamp_pose(pose: list[float]) -> list[float]:
 
 
 def smoothstep(s: float) -> float:
-    ''' This function ensures that smooth transitions between gestures start and finish 
-        gently, with zero slope at both ends.
+    ''' Smoothstep easing: turns elapsed time (s, 0 -> 1) (normalized to 1s) into how far the arm
+        should have moved (0 -> 1), so transitions between gestures start and
+        finish gently instead of jerking like a simple linear interpolation.
 
-        It ensures a slower start and finish than using a simple linear interpolation. 
+        f(s) = 3s^2 - 2s^3 is the simplest polynomial (a cubic) with
+          f(0) = 0, f(1) = 1     -> starts at the old pose, ends at the new one
+          f'(0) = 0, f'(1) = 0   -> zero speed at both ends, so no jolt or abrupt stop
+        Solving those four conditions for a s^3 + b s^2 + c s + d gives a = -2, b = 3, c = d = 0.
+        A plain linear blend (f(s) = s) can't have zero speed at the ends, so it jerks.
+        Also known as "smoothstep" in computer graphics: https://en.wikipedia.org/wiki/Smoothstep
     '''
-    s = max(0.0, min(1.0, s))
-    return s * s * (3 - 2 * s)
+    s = max(0.0, min(1.0, s))     # clamp: before the transition stay at 0, after it stay at 1
+    return s * s * (3 - 2 * s)    # = 3s^2 - 2s^3
 
 
 def smooth_transition(a: list[float], b: list[float], s: float) -> list[float]:
-    ''' Trajectory smoothing between gestures: the pose s of the way (0..1) from a to b, eased by smoothstep. '''
+    ''' Trajectory smoothing between gestures: move every joint from pose a toward
+        pose b by the eased fraction smoothstep(s), where s is the fraction of the
+        transition's time that has passed (0 -> 1).
+    '''
     k = smoothstep(s)
-    return [x + (y - x) * k for x, y in zip(a, b)]
+    return [x + (y - x) * k for x, y in zip(a, b)]   # for each joint: start + (end - start) * k
 
 
 def idle_pose(t: float) -> list[float]:
@@ -73,11 +93,13 @@ def idle_pose(t: float) -> list[float]:
         Peak speed is ~22 deg/s.
     '''
     base, shoulder, elbow, wrist, roll = IDLE_CENTER
+    sway_base, sway_shoulder, sway_elbow, sway_wrist = IDLE_SWAY_DEG
+    period_base, period_shoulder, period_elbow, period_wrist = IDLE_PERIOD_S
     return [
-        base + 30.0 * _sin(t, 14.0),
-        shoulder + 10 * _sin(t, 9.0),
-        elbow + 12.0 * _sin(t, 9.0, 1.0),
-        wrist + 25.0 * _sin(t, 7.0),
+        base + sway_base * _sin(t, period_base),
+        shoulder + sway_shoulder * _sin(t, period_shoulder),
+        elbow + sway_elbow * _sin(t, period_elbow, 1.0),   # lags the shoulder by 1 rad so they don't move in lockstep
+        wrist + sway_wrist * _sin(t, period_wrist),
         roll,
     ]
 
@@ -90,8 +112,8 @@ def nearest_idle_time(pose: list[float], step_s: float = 0.1) -> float:
         doesn't swing around to match the idle pose's base angle since the base accounts for the largest motion.
     '''
 
-    weights = (10.0, 1.0, 1.0, 1.0, 0.0)
-    times = (i * step_s for i in range(int(IDLE_CYCLE_S / step_s)))
+    weights = (10.0, 1.0, 1.0, 1.0, 0.0)   # base, shoulder, elbow, wrist pitch, wrist roll (roll is constant in idle)
+    times = (i * step_s for i in range(int(IDLE_CYCLE_S / step_s)))   # every step_s seconds over one full idle cycle
     return min(times, key=lambda t: sum(w * (a - b) ** 2
                                         for w, a, b in zip(weights, idle_pose(t), pose)))
 
@@ -108,8 +130,8 @@ def wave_pose(t: float, base: float) -> list[float]:
         with wrist roll adding the hand's rocking motion.
     '''
     pose = [base] + RAISED[1:]
-    pose[0] += 10.0 * _sin(t, WAVE_PERIOD_S)
-    pose[4] += 15.0 * _sin(t, WAVE_PERIOD_S)
+    pose[0] += WAVE_SWAY_DEG * _sin(t, WAVE_PERIOD_S)   # base
+    pose[4] += WAVE_ROCK_DEG * _sin(t, WAVE_PERIOD_S)   # wrist roll
     return pose
 
 
@@ -126,7 +148,8 @@ def beckon_pose(t: float, base: float) -> list[float]:
     return [
         base,
         shoulder,
-        elbow + 10.0 * _sin(t, BECKON_PERIOD_S),
+        elbow + BECKON_ELBOW_DEG * _sin(t, BECKON_PERIOD_S),
+        # (1 - cos) runs 0 -> 2 -> 0 over one period, so the wrist curls BECKON_CURL_DEG up and back
         wrist - BECKON_CURL_DEG / 2 * (1 - math.cos(2 * math.pi * t / BECKON_PERIOD_S)),
         roll,
     ]

@@ -30,7 +30,7 @@ VISION_NAME = "people_detector"
 CAMERA_NAME = "cam"
 CAMERA_HFOV_DEG = 70.0   # horizontal field of view of the camera (70 deg is good for most webcams)
 MIRRORED = False         # set True if the webcam feed is horizontally flipped
-MIN_CONFIDENCE = 0.5
+MIN_CONFIDENCE = 0.5     # ignore detections the model is less than 50% sure of
 PERSON_LABEL = "person"  # compared case-insensitively (EfficientDet-COCO reports "Person")
 
 
@@ -80,7 +80,8 @@ class PersonDetector:
             coordinates always match the image size used to convert them.
         '''
         result = await self.vision.capture_all_from_camera(
-            self.camera_name, return_image=True, return_detections=True, timeout=5,
+            self.camera_name, return_image=True, return_detections=True,
+            timeout=5,   # seconds; a frame normally takes ~160 ms, so this only trips if the camera or service hangs
         )
         if result.image is None or not result.image.width:
             raise RuntimeError("vision service returned no image; cannot size detections")
@@ -119,7 +120,7 @@ async def main():
                 people = await detector.detect()
             except Exception as e:  # keep watching through a dropped frame or RPC blip
                 print(f"  detection failed: {type(e).__name__}: {e}")
-                await asyncio.sleep(1)
+                await asyncio.sleep(1)   # viewer only: pause a second before retrying a failed frame
                 continue
             latency_ms = (time.perf_counter() - start) * 1000
             summary = " | ".join(
@@ -127,7 +128,8 @@ async def main():
                 f"elev {p.elevation_deg:+5.1f}° size {p.size:.2f}"
                 for p in people) or "no one"
             print(f"[{latency_ms:5.0f} ms] {summary}")
-            await asyncio.sleep(0.2)    # sleep for the viewer only, not used within the perception loop
+            
+            await asyncio.sleep(0.2)    # # Viewer only: slows the printout to ~5 lines a second so it's readable. Does not impact Greeter's perception loop
 
 
 if __name__ == "__main__":
