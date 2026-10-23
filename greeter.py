@@ -20,6 +20,7 @@ import asyncio
 import os
 import time
 from datetime import timedelta
+from enum import Enum
 
 from viam.components.arm import Arm
 from viam.proto.component.arm import JointPositions
@@ -52,13 +53,23 @@ LOST_S      = 2.0         # end a greeting early once the target is gone this lo
 BASE_FOLLOW = 0.2         # per-tick smoothing of the base toward the person's bearing
 
 
+class Phase(Enum):
+    ''' The state machine's phases. Using an enum instead of plain strings means a
+        misspelled phase fails immediately instead of silently skipping a gesture.
+    '''
+    IDLE = "idle"
+    POINT = "point"
+    BECKON = "beckon"
+    WAVE = "wave"
+
+
 class Greeter:
     def __init__(self, arm: Arm, detector: PersonDetector):
         self.arm      = arm
         self.detector = detector
         self.tracker  = PeopleTracker()
 
-        self.phase = "idle"
+        self.phase = Phase.IDLE
         self.motion_clock = 0.0  # seconds of motion played; advances at SPEED x real time
         self.phase_start  = 0.0  # motion_clock when the current phase began
         self.smooth_from: list[float] | None = None
@@ -82,9 +93,9 @@ class Greeter:
 
     # --- behavior -----------------------------------------------------------
 
-    def set_phase(self, phase: str, now: float, smooth_s: float = TRANSITION_S):
+    def set_phase(self, phase: Phase, now: float, smooth_s: float = TRANSITION_S):
         waiting = self.tracker.waiting(now, exclude=self.target_id)
-        print(f"{phase:>6}  (others waiting: {waiting})")
+        print(f"{phase.value:>6}  (others waiting: {waiting})")
         self.phase, self.phase_start = phase, self.motion_clock
         self.smooth_from = self.last_cmd  # every switch smooths from wherever the arm is
         self.smooth_s = smooth_s
@@ -92,7 +103,7 @@ class Greeter:
     def start_idle(self, now: float):
         ''' Resume idle at the point on its path nearest the arm's current pose. '''
         self.idle_epoch = self.motion_clock - gestures.nearest_idle_time(self.last_cmd)
-        self.set_phase("idle", now)
+        self.set_phase(Phase.IDLE, now)
 
     def idle_pose(self) -> list[float]:
         return gestures.idle_pose(self.motion_clock - self.idle_epoch)
@@ -112,12 +123,12 @@ class Greeter:
         '''
         t = self.motion_clock - self.phase_start
 
-        if self.phase == "idle":
+        if self.phase == Phase.IDLE:
             target = self.tracker.next_target(now)
             if target and t >= MIN_IDLE_S:
                 self.target_id = target.id
                 self.target_base = self.last_cmd[0] if self.last_cmd else 0.0
-                self.set_phase("point", now)
+                self.set_phase(Phase.POINT, now)
                 t = 0.0
             else:
                 return self.idle_pose()
@@ -132,15 +143,15 @@ class Greeter:
         self.target_base += BASE_FOLLOW * (-target.bearing_deg - self.target_base)
         gesture_t = max(0.0, t - TRANSITION_S)  # gesture clock starts once the transition is smoothed
 
-        if self.phase == "point":
+        if self.phase == Phase.POINT:
             if t < POINT_S:
                 return gestures.point_pose(self.target_base)
-            self.set_phase("beckon", now)
+            self.set_phase(Phase.BECKON, now)
             t, gesture_t = 0.0, 0.0
-        if self.phase == "beckon":
+        if self.phase == Phase.BECKON:
             if t < BECKON_S:
                 return gestures.beckon_pose(gesture_t, self.target_base)
-            self.set_phase("wave", now, smooth_s=WAVE_SMOOTH_S)
+            self.set_phase(Phase.WAVE, now, smooth_s=WAVE_SMOOTH_S)
             t = 0.0
         if t < WAVE_S:
             pose = gestures.wave_pose(t, self.target_base)  # sways during the transition too
