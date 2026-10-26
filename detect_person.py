@@ -70,6 +70,10 @@ def pixel_to_direction(u: float, v: float, width: int, height: int,
 
 
 class PersonDetector:
+    ''' Gets people from the vision service, one camera frame at a time, as bearings 
+        the arm can turn toward.
+    '''
+
     def __init__(self, robot: RobotClient, min_confidence: float = MIN_CONFIDENCE, min_size: float = MIN_SIZE):
         self.vision = VisionClient.from_robot(robot, VISION_NAME)
         self.camera_name = CAMERA_NAME
