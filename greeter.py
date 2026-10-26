@@ -72,6 +72,10 @@ class Phase(Enum):
 
 
 class Greeter:
+    ''' The robot's behavior: a perception loop that tracks people and a motion loop
+        that runs the state machine (idle, point, beckon, wave) and sends poses to the arm.
+    '''
+
     def __init__(self, arm: Arm, detector: PersonDetector):
         self.arm      = arm
         self.detector = detector
